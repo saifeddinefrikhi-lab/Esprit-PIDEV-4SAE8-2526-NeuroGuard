@@ -5,10 +5,13 @@ export interface CommentDto {
   authorId: number;
   authorUsername: string;
   createdAt: string;
-  parentCommentId?: number | null; // new: if it's a reply
-  likeCount: number;                // new
-  replyCount: number;               // new
-  likedByCurrentUser?: boolean;      // new
+  updatedAt?: string | null;         // set when edited
+  parentCommentId?: number | null;
+  likeCount: number;
+  replyCount: number;
+  likedByCurrentUser?: boolean;
+  /** Filled client-side when building comment tree */
+  replies?: CommentDto[];
 }
 
 export interface CreateCommentRequest {

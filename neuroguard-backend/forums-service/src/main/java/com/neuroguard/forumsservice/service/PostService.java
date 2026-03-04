@@ -11,8 +11,10 @@ import com.neuroguard.forumsservice.repository.PostLikeRepository;
 import com.neuroguard.forumsservice.repository.PostRepository;
 import com.neuroguard.forumsservice.repository.PostShareRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,14 +40,14 @@ public class PostService {
     }
 
     public List<PostResponse> getAllPosts(Long currentUserId) {
-        return postRepository.findAll().stream()
+        return postRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(post -> mapToResponse(post, currentUserId))
                 .collect(Collectors.toList());
     }
 
     public PostResponse getPostById(Long id, Long currentUserId) {
         Post post = postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
         return mapToResponse(post, currentUserId);
     }
 

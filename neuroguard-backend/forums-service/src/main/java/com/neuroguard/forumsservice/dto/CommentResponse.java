@@ -13,6 +13,7 @@ public class CommentResponse {
     private Long authorId;
     private String authorUsername;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;       // set when edited
     private Long parentCommentId;           // null if top-level
     private int likeCount;
     private int replyCount;                 // number of direct replies

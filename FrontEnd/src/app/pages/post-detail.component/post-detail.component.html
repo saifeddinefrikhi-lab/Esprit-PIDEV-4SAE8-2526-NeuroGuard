@@ -1,17 +1,44 @@
-<div class="post-detail-container" *ngIf="post as post">
-  <!-- Post Content Card -->
-  <div class="post-card">
-    <div class="post-header">
-      <div class="author-section">
-        <div class="avatar">{{ (post.authorUsername || 'Unknown').charAt(0).toUpperCase() }}</div>
-        <div class="author-info">
-          <h3 class="author-name">{{ post.authorUsername || 'Unknown User' }}</h3>
-          <div class="post-meta">
-            <span class="date">{{ post.createdAt | date:'MMMM d, y' }}</span>
-            <span *ngIf="post.updatedAt !== post.createdAt" class="edited-badge">Edited</span>
+<div class="post-detail-page">
+  <!-- Loading state -->
+  <div *ngIf="postLoading" class="post-detail-loading">
+    <div class="spinner"></div>
+    <p>Loading post...</p>
+  </div>
+
+  <!-- Error / 404 state -->
+  <div *ngIf="error && !postLoading" class="post-detail-error">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="8" x2="12" y2="12"></line>
+      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+    </svg>
+    <h2>{{ notFound ? 'Post not found' : 'Something went wrong' }}</h2>
+    <p>{{ error }}</p>
+    <button (click)="backToForum()" class="btn-back">Back to forum</button>
+  </div>
+
+  <!-- Post content -->
+  <div class="post-detail-container" *ngIf="post && !postLoading">
+    <a (click)="backToForum()" class="back-link" tabindex="0" (keydown.enter)="backToForum()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      Back to forum
+    </a>
+    <!-- Post Content Card -->
+    <div class="post-card">
+      <div class="post-header">
+        <div class="author-section">
+          <div class="avatar">{{ (post.authorUsername || 'Unknown').charAt(0).toUpperCase() }}</div>
+          <div class="author-info">
+            <h3 class="author-name">{{ post.authorUsername || 'Unknown User' }}</h3>
+            <div class="post-meta">
+              <span class="date">{{ post.createdAt | date:'MMMM d, y' }}</span>
+              <span *ngIf="post.updatedAt !== post.createdAt" class="edited-badge">Edited</span>
+            </div>
           </div>
         </div>
-      </div>
       <div *ngIf="canEditPost()" class="post-actions-menu">
         <button (click)="editPost()" class="btn-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -88,8 +115,8 @@
     </div>
   </div>
 
-  <!-- Comments Section -->
-  <div class="comments-section">
+  <!-- Comments Section (only when post is loaded) -->
+  <div class="comments-section" *ngIf="post && !postLoading">
     <div class="section-header">
       <h2>Discussion <span class="count">({{ comments.length }})</span></h2>
     </div>
@@ -126,6 +153,8 @@
           <div class="comment-header">
             <span class="comment-author">{{ comment.authorUsername || 'Unknown User' }}</span>
             <span class="comment-date">{{ comment.createdAt | date:'MMM d, y' }}</span>
+            <span *ngIf="comment.updatedAt && comment.updatedAt !== comment.createdAt" class="edited-badge">Edited</span>
+            <button *ngIf="canEditComment(comment) && editingCommentId !== comment.id" (click)="startEditComment(comment)" class="btn-edit">Edit</button>
             <button *ngIf="canDeleteComment(comment)" (click)="deleteComment(comment.id)" class="btn-delete">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -134,9 +163,18 @@
             </button>
           </div>
           
-          <p class="comment-text">{{ comment.content }}</p>
+          <div *ngIf="editingCommentId !== comment.id" class="comment-text">{{ comment.content }}</div>
+          <div *ngIf="editingCommentId === comment.id" class="comment-edit-form">
+            <form [formGroup]="editCommentForm" (ngSubmit)="saveEditComment()">
+              <textarea formControlName="content" class="edit-comment-input" rows="3"></textarea>
+              <div class="edit-comment-actions">
+                <button type="submit" class="btn-save" [disabled]="editCommentForm.invalid || loading">Save</button>
+                <button type="button" (click)="cancelEditComment()" class="btn-cancel-edit">Cancel</button>
+              </div>
+            </form>
+          </div>
           
-          <div class="comment-actions">
+          <div class="comment-actions" *ngIf="editingCommentId !== comment.id">
             <button 
               (click)="likeComment(comment)" 
               [class.active]="comment.likedByCurrentUser" 
@@ -178,6 +216,8 @@
                 <div class="reply-header">
                   <span class="reply-author">{{ reply.authorUsername || 'Unknown User' }}</span>
                   <span class="reply-date">{{ reply.createdAt | date:'MMM d' }}</span>
+                  <span *ngIf="reply.updatedAt && reply.updatedAt !== reply.createdAt" class="edited-badge">Edited</span>
+                  <button *ngIf="canEditComment(reply) && editingCommentId !== reply.id" (click)="startEditComment(reply)" class="btn-edit">Edit</button>
                   <button *ngIf="canDeleteComment(reply)" (click)="deleteComment(reply.id)" class="btn-delete">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="3 6 5 6 21 6"></polyline>
@@ -185,8 +225,17 @@
                     </svg>
                   </button>
                 </div>
-                <p class="reply-text">{{ reply.content }}</p>
-                <div class="reply-actions">
+                <div *ngIf="editingCommentId !== reply.id" class="reply-text">{{ reply.content }}</div>
+                <div *ngIf="editingCommentId === reply.id" class="comment-edit-form">
+                  <form [formGroup]="editCommentForm" (ngSubmit)="saveEditComment()">
+                    <textarea formControlName="content" class="edit-comment-input" rows="2"></textarea>
+                    <div class="edit-comment-actions">
+                      <button type="submit" class="btn-save" [disabled]="editCommentForm.invalid || loading">Save</button>
+                      <button type="button" (click)="cancelEditComment()" class="btn-cancel-edit">Cancel</button>
+                    </div>
+                  </form>
+                </div>
+                <div class="reply-actions" *ngIf="editingCommentId !== reply.id">
                   <button 
                     (click)="likeComment(reply)" 
                     [class.active]="reply.likedByCurrentUser" 

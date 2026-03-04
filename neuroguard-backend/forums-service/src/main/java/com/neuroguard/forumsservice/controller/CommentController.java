@@ -50,6 +50,20 @@ public class CommentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    // Authenticated: update comment (author or admin)
+    @PutMapping("/{commentId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<CommentResponse> updateComment(
+            @PathVariable Long postId,
+            @PathVariable Long commentId,
+            @Valid @RequestBody CommentRequest request,
+            HttpServletRequest httpRequest) {
+        Long userId = getCurrentUserId(httpRequest);
+        String role = getCurrentUserRole(httpRequest);
+        CommentResponse updated = commentService.updateComment(commentId, request, userId, role);
+        return ResponseEntity.ok(updated);
+    }
+
     // Authenticated: delete comment (author or admin)
     @DeleteMapping("/{commentId}")
     @PreAuthorize("isAuthenticated()")

@@ -60,6 +60,19 @@ public class CommentService {
     }
 
     @Transactional
+    public CommentResponse updateComment(Long commentId, CommentRequest request, Long currentUserId, String currentUserRole) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+
+        if (!comment.getAuthorId().equals(currentUserId) && !"ADMIN".equals(currentUserRole)) {
+            throw new RuntimeException("You are not authorized to update this comment");
+        }
+        comment.setContent(request.getContent());
+        Comment saved = commentRepository.save(comment);
+        return mapToResponse(saved, currentUserId);
+    }
+
+    @Transactional
     public void deleteComment(Long commentId, Long currentUserId, String currentUserRole) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new RuntimeException("Comment not found"));
@@ -71,7 +84,7 @@ public class CommentService {
     }
 
     public List<CommentResponse> getCommentsByPost(Long postId, Long currentUserId) {
-        return commentRepository.findByPostId(postId).stream()
+        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(comment -> mapToResponse(comment, currentUserId))
                 .collect(Collectors.toList());
     }
@@ -82,7 +95,7 @@ public class CommentService {
     // }
 
     public int countCommentsByPost(Long postId) {
-        return commentRepository.findByPostId(postId).size();
+        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).size();
     }
 
     @Transactional
@@ -113,6 +126,7 @@ public class CommentService {
         response.setPostId(comment.getPost().getId());
         response.setAuthorId(comment.getAuthorId());
         response.setCreatedAt(comment.getCreatedAt());
+        response.setUpdatedAt(comment.getUpdatedAt());
         response.setParentCommentId(comment.getParentComment() != null ? comment.getParentComment().getId() : null);
         response.setLikeCount(comment.getLikes().size());
         response.setReplyCount(comment.getReplies().size());

@@ -57,11 +57,15 @@ export class ForumService {
     return this.http.post<CommentDto>(`${this.baseUrl}/${postId}/comments`, request);
   }
 
+  updateComment(postId: number, commentId: number, request: CreateCommentRequest): Observable<CommentDto> {
+    return this.http.put<CommentDto>(`${this.baseUrl}/${postId}/comments/${commentId}`, request);
+  }
+
   deleteComment(postId: number, commentId: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${postId}/comments/${commentId}`);
   }
 
-  // New: Like/unlike comment
+  // Like/unlike comment
   likeComment(postId: number, commentId: number): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/${postId}/comments/${commentId}/like`, {});
   }

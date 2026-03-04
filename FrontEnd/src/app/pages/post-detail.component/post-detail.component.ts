@@ -8,7 +8,8 @@ import { PostDto } from '../../core/models/post.dto';
 import { CommentDto, CreateCommentRequest, CreateReplyRequest } from '../../core/models/comment.dto';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { asyncScheduler, observeOn, of, Observable, forkJoin, map, catchError } from 'rxjs';
+import { observeOn, of, Observable, forkJoin, map, catchError } from 'rxjs';
+import { asyncScheduler } from 'rxjs';
 
 @Component({
   selector: 'app-post-detail',
@@ -24,10 +25,14 @@ export class PostDetailComponent implements OnInit {
   topLevelComments: CommentDto[] = [];
   commentForm: FormGroup;
   replyForm: FormGroup;
-  replyingTo: number | null = null; // comment id we are replying to
+  editCommentForm: FormGroup;
+  replyingTo: number | null = null;
+  editingCommentId: number | null = null;
   loading = false;
+  postLoading = false;
   error = '';
-  private userCache: Map<number, string> = new Map(); // Cache usernames by userId
+  notFound = false;
+  private userCache: Map<number, string> = new Map();
 
   constructor(
     private route: ActivatedRoute,
@@ -44,381 +49,285 @@ export class PostDetailComponent implements OnInit {
     this.replyForm = this.fb.group({
       content: ['', [Validators.required, Validators.minLength(2)]]
     });
+    this.editCommentForm = this.fb.group({
+      content: ['', [Validators.required, Validators.minLength(2)]]
+    });
   }
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.loadPost(+id);
-      this.loadComments(+id);
+    const idParam = this.route.snapshot.paramMap.get('id');
+    if (!idParam) {
+      this.error = 'Invalid post.';
+      this.cdr.markForCheck();
+      return;
     }
+    const id = +idParam;
+    if (isNaN(id) || id < 1) {
+      this.error = 'Invalid post.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.loadPost(id);
+    this.loadComments(id);
   }
 
   loadPost(id: number): void {
-    console.log(`Loading post ${id}...`);
+    this.postLoading = true;
+    this.error = '';
+    this.notFound = false;
+    this.cdr.markForCheck();
     this.forumService.getPostById(id).pipe(observeOn(asyncScheduler)).subscribe({
       next: (data) => {
-        console.log('Post loaded:', data);
         this.post = data;
+        this.postLoading = false;
         this.cdr.markForCheck();
-        // Resolve username if missing or showing "Unknown"
         if (!data.authorUsername || data.authorUsername.trim() === '' || data.authorUsername === 'Unknown') {
-          console.log(`Post authorUsername is empty/Unknown, resolving for authorId: ${data.authorId}`);
-          this.resolveUsername(data.authorId).subscribe(
-            username => {
+          this.resolveUsername(data.authorId).subscribe({
+            next: username => {
               if (this.post) {
                 this.post.authorUsername = username;
                 this.cdr.markForCheck();
               }
             },
-            error => {
+            error: () => {
               if (this.post) {
                 this.post.authorUsername = 'Unknown User';
                 this.cdr.markForCheck();
               }
             }
-          );
-        } else {
-          console.log(`Post already has authorUsername: ${data.authorUsername}`);
+          });
         }
       },
-      error: (err) => {
-        this.error = 'Failed to load post.';
-        console.error('Error loading post:', err);
+      error: (err: { status?: number }) => {
+        this.postLoading = false;
+        this.notFound = err?.status === 404;
+        this.error = this.notFound ? 'Post not found.' : 'Failed to load post.';
         this.cdr.markForCheck();
       }
     });
   }
 
   loadComments(postId: number): void {
-    console.log(`Loading comments for post ${postId}...`);
     this.forumService.getCommentsByPost(postId).pipe(observeOn(asyncScheduler)).subscribe({
       next: (data) => {
-        console.log('Comments loaded:', data);
         this.comments = data;
         this.resolveCommentUsernames();
         this.processComments();
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        console.error(err);
-        this.cdr.markForCheck();
-      }
+      error: () => this.cdr.markForCheck()
     });
   }
 
   private resolveCommentUsernames(): void {
-    const commentsNeedingUsernames = this.comments.filter(
-      comment => !comment.authorUsername || comment.authorUsername.trim() === '' || comment.authorUsername === 'Unknown'
-    );
-
-    if (commentsNeedingUsernames.length === 0) {
-      return; // All comments already have usernames
-    }
-
-    console.log(`Resolving usernames for ${commentsNeedingUsernames.length} comments`);
-
-    // Create an array of observables for all username resolutions
-    const usernameResolutions = commentsNeedingUsernames.map(comment =>
-      this.resolveUsername(comment.authorId).pipe(
-        map(username => ({ comment, username })),
-        // In case of error, fallback to 'Unknown User' for that comment
-        catchError((error) => {
-          console.warn(`Error resolving username for authorId ${comment.authorId}:`, error);
-          return of({ comment, username: 'Unknown User' });
-        })
-      )
-    );
-
-    // Wait for all username resolutions to complete
-    forkJoin(usernameResolutions).subscribe(
-      results => {
+    const need = this.comments.filter(c => !c.authorUsername || c.authorUsername.trim() === '' || c.authorUsername === 'Unknown');
+    if (need.length === 0) return;
+    forkJoin(need.map(c => this.resolveUsername(c.authorId).pipe(
+      map(username => ({ comment: c, username })),
+      catchError(() => of({ comment: c, username: 'Unknown User' }))
+    ))).subscribe({
+      next: results => {
         results.forEach(({ comment, username }) => {
-          const commentToUpdate = this.comments.find(c => c.id === comment.id);
-          if (commentToUpdate) {
-            console.log(`Updating comment ${commentToUpdate.id} with username: ${username}`);
-            commentToUpdate.authorUsername = username;
-          }
+          const x = this.comments.find(c => c.id === comment.id);
+          if (x) x.authorUsername = username;
         });
         this.cdr.markForCheck();
       },
-      error => {
-        // Even if some resolutions fail, mark for check to update UI
-        console.error('Error resolving comment usernames:', error);
-        this.cdr.markForCheck();
-      }
-    );
-  }
-
-  private resolveUsername(userId: number): Observable<string> {
-    if (this.userCache.has(userId)) {
-      const cached = this.userCache.get(userId) || '';
-      console.log(`Username cache hit for userId ${userId}: ${cached}`);
-      return of(cached);
-    }
-
-    console.log(`Fetching username for userId ${userId}`);
-    return new Observable<string>(observer => {
-      this.userService.getUserById(userId).subscribe(
-        user => {
-          // Build full name from firstName and lastName, fallback to username if both are empty
-          const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Unknown User';
-          console.log(`Resolved userId ${userId} to: ${fullName}`, user);
-          this.userCache.set(userId, fullName);
-          observer.next(fullName);
-          observer.complete();
-        },
-        error => {
-          console.error(`Failed to resolve username for userId ${userId}:`, error);
-          observer.error(error);
-        }
-      );
+      error: () => this.cdr.markForCheck()
     });
   }
 
-  // Post actions
+  private resolveUsername(userId: number): Observable<string> {
+    if (this.userCache.has(userId)) return of(this.userCache.get(userId)!);
+    return new Observable(observer => {
+      this.userService.getUserById(userId).subscribe({
+        next: user => {
+          const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Unknown User';
+          this.userCache.set(userId, name);
+          observer.next(name);
+          observer.complete();
+        },
+        error: e => observer.error(e)
+      });
+    });
+  }
+
   likePost(): void {
     if (!this.post) return;
-    if (!this.authService.isLoggedIn) {
-      this.router.navigate(['/login']);
-      return;
-    }
+    if (!this.authService.isLoggedIn) { this.router.navigate(['/login']); return; }
     if (this.post.likedByCurrentUser) {
       this.forumService.unlikePost(this.post.id).subscribe({
-        next: () => {
-          if (this.post) {
-            this.post.likedByCurrentUser = false;
-            this.post.likeCount--;
-            this.cdr.markForCheck();
-          }
-        },
-        error: (err) => {
-          console.error('Failed to unlike post:', err);
-          alert('Failed to unlike post. Please try again.');
-        }
+        next: () => { if (this.post) { this.post.likedByCurrentUser = false; this.post.likeCount--; this.cdr.markForCheck(); } },
+        error: () => alert('Failed to unlike post.')
       });
     } else {
       this.forumService.likePost(this.post.id).subscribe({
-        next: () => {
-          if (this.post) {
-            this.post.likedByCurrentUser = true;
-            this.post.likeCount++;
-            this.cdr.markForCheck();
-          }
-        },
-        error: (err) => {
-          console.error('Failed to like post:', err);
-          alert('Failed to like post. Please try again.');
-        }
+        next: () => { if (this.post) { this.post.likedByCurrentUser = true; this.post.likeCount++; this.cdr.markForCheck(); } },
+        error: () => alert('Failed to like post.')
       });
     }
   }
 
   sharePost(): void {
-    if (!this.post) return;
-    if (!this.authService.isLoggedIn) {
-      this.router.navigate(['/login']);
-      return;
-    }
-    if (this.post.sharedByCurrentUser) {
-      alert('You already shared this post.');
-    } else {
-      this.forumService.sharePost(this.post.id).subscribe({
-        next: () => {
-          if (this.post) {
-            this.post.sharedByCurrentUser = true;
-            this.post.shareCount++;
-            this.cdr.markForCheck();
-          }
-        },
-        error: (err) => {
-          console.error('Failed to share post:', err);
-          alert('Failed to share post. Please try again.');
-        }
-      });
-    }
+    if (!this.post || !this.authService.isLoggedIn) return;
+    if (this.post.sharedByCurrentUser) { alert('You already shared this post.'); return; }
+    this.forumService.sharePost(this.post.id).subscribe({
+      next: () => { if (this.post) { this.post.sharedByCurrentUser = true; this.post.shareCount++; this.cdr.markForCheck(); } },
+      error: () => alert('Failed to share post.')
+    });
   }
 
-  // Comment actions
   addComment(): void {
     if (this.commentForm.invalid || !this.post) return;
-
     this.loading = true;
-    const request: CreateCommentRequest = { content: this.commentForm.value.content };
-
-    this.forumService.addComment(this.post.id, request).subscribe({
-      next: (comment) => {
+    this.forumService.addComment(this.post.id, { content: this.commentForm.value.content }).subscribe({
+      next: comment => {
         this.comments.push(comment);
         this.processComments();
         this.commentForm.reset();
         this.loading = false;
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        alert('Failed to add comment.');
-        this.loading = false;
-        this.cdr.markForCheck();
-      }
+      error: () => { this.loading = false; this.cdr.markForCheck(); }
     });
   }
 
   deleteComment(commentId: number): void {
-    if (!this.post) return;
-    if (!confirm('Delete this comment?')) return;
-
+    if (!this.post || !confirm('Delete this comment?')) return;
     this.forumService.deleteComment(this.post.id, commentId).subscribe({
-      next: () => {
-        this.comments = this.comments.filter(c => c.id !== commentId);
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        alert('Failed to delete comment.');
-        this.cdr.markForCheck();
-      }
+      next: () => { this.comments = this.comments.filter(c => c.id !== commentId); this.cdr.markForCheck(); },
+      error: () => alert('Failed to delete comment.')
     });
   }
 
   likeComment(comment: CommentDto): void {
     if (!this.post) return;
-    if (!this.authService.isLoggedIn) {
-      this.router.navigate(['/login']);
-      return;
-    }
+    if (!this.authService.isLoggedIn) { this.router.navigate(['/login']); return; }
     if (comment.likedByCurrentUser) {
       this.forumService.unlikeComment(this.post.id, comment.id).subscribe({
-        next: () => {
-          comment.likedByCurrentUser = false;
-          comment.likeCount--;
-          this.cdr.markForCheck();
-        },
-        error: (err) => {
-          console.error('Failed to unlike comment:', err);
-          alert('Failed to unlike comment. Please try again.');
-        }
+        next: () => { comment.likedByCurrentUser = false; comment.likeCount--; this.cdr.markForCheck(); },
+        error: () => alert('Failed to unlike comment.')
       });
     } else {
       this.forumService.likeComment(this.post.id, comment.id).subscribe({
-        next: () => {
-          comment.likedByCurrentUser = true;
-          comment.likeCount++;
-          this.cdr.markForCheck();
-        },
-        error: (err) => {
-          console.error('Failed to like comment:', err);
-          alert('Failed to like comment. Please try again.');
-        }
+        next: () => { comment.likedByCurrentUser = true; comment.likeCount++; this.cdr.markForCheck(); },
+        error: () => alert('Failed to like comment.')
       });
     }
   }
 
   setReplyingTo(commentId: number | null): void {
     this.replyingTo = commentId;
-    if (commentId) {
-      this.replyForm.reset();
-    }
+    if (commentId) this.replyForm.reset();
+    this.editingCommentId = null;
+    this.cdr.markForCheck();
   }
 
   submitReply(): void {
     if (this.replyForm.invalid || !this.post || !this.replyingTo) return;
-
-    const request: CreateReplyRequest = { content: this.replyForm.value.content };
-    this.forumService.replyToComment(this.post.id, this.replyingTo, request).subscribe({
-      next: (reply) => {
-        // Add reply to comments list
+    this.forumService.replyToComment(this.post.id, this.replyingTo, { content: this.replyForm.value.content }).subscribe({
+      next: reply => {
         this.comments.push(reply);
         this.processComments();
         this.replyingTo = null;
         this.replyForm.reset();
         this.cdr.markForCheck();
       },
-      error: (err) => {
-        alert('Failed to post reply.');
-        this.cdr.markForCheck();
-      }
+      error: () => alert('Failed to post reply.')
     });
   }
 
   canEditPost(): boolean {
-    const user = this.authService.currentUser;
-    return user?.role === 'ADMIN' || user?.userId === this.post?.authorId;
+    const u = this.authService.currentUser;
+    return !!u && (u.role === 'ADMIN' || u.userId === this.post?.authorId);
   }
 
   editPost(): void {
-    if (this.post) {
-      this.router.navigate([this.getForumBasePath(), 'edit', this.post.id]);
-    }
+    if (this.post) this.router.navigate([this.getForumBasePath(), 'edit', this.post.id]);
   }
 
   deletePost(): void {
-    if (!this.post) return;
-    if (confirm('Delete this post?')) {
-      this.forumService.deletePost(this.post.id).subscribe({
-        next: () => this.router.navigate([this.getForumBasePath()]),
-        error: (err) => alert('Failed to delete post.')
-      });
-    }
+    if (!this.post || !confirm('Delete this post?')) return;
+    this.forumService.deletePost(this.post.id).subscribe({
+      next: () => this.router.navigate([this.getForumBasePath()]),
+      error: () => alert('Failed to delete post.')
+    });
   }
 
   canDeleteComment(comment: CommentDto): boolean {
-    const user = this.authService.currentUser;
-    return user?.role === 'ADMIN' || user?.userId === comment.authorId;
+    const u = this.authService.currentUser;
+    return !!u && (u.role === 'ADMIN' || u.userId === comment.authorId);
+  }
+
+  canEditComment(comment: CommentDto): boolean {
+    return this.canDeleteComment(comment);
+  }
+
+  startEditComment(comment: CommentDto): void {
+    this.editingCommentId = comment.id;
+    this.editCommentForm.patchValue({ content: comment.content });
+    this.replyingTo = null;
+    this.cdr.markForCheck();
+  }
+
+  saveEditComment(): void {
+    if (this.editCommentForm.invalid || !this.post || this.editingCommentId == null) return;
+    this.loading = true;
+    this.forumService.updateComment(this.post.id, this.editingCommentId, { content: this.editCommentForm.value.content }).subscribe({
+      next: updated => {
+        const i = this.comments.findIndex(c => c.id === updated.id);
+        if (i !== -1) this.comments[i] = updated;
+        this.processComments();
+        this.editingCommentId = null;
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.loading = false; this.cdr.markForCheck(); alert('Failed to update comment.'); }
+    });
+  }
+
+  cancelEditComment(): void {
+    this.editingCommentId = null;
+    this.cdr.markForCheck();
+  }
+
+  backToForum(): void {
+    this.router.navigate([this.getForumBasePath()]);
   }
 
   private getForumBasePath(): string {
-    const role = this.authService.currentUser?.role;
-
-    if (role === 'ADMIN') {
-      return '/admin/forum';
-    }
-    if (role === 'PATIENT') {
-      return '/patient/forum';
-    }
-    if (role === 'CAREGIVER') {
-      return '/caregiver/forum';
-    }
-    if (role === 'PROVIDER') {
-      return '/provider/forum';
-    }
-
+    const r = this.authService.currentUser?.role;
+    if (r === 'ADMIN') return '/admin/forum';
+    if (r === 'PATIENT') return '/patient/forum';
+    if (r === 'CAREGIVER') return '/caregiver/forum';
+    if (r === 'PROVIDER') return '/provider/forum';
     return '/homePage';
   }
 
-  // Get replies for a comment (helper for template)
   getReplies(comment: CommentDto): CommentDto[] {
-    return (comment as any).replies || [];
+    return comment.replies || [];
   }
 
-  // Get current user's name
   getCurrentUserName(): string {
     return this.authService.currentUser?.name || 'User';
   }
 
-  // Get current user's initial
   getCurrentUserInitial(): string {
-    const name = this.getCurrentUserName();
-    return name.charAt(0).toUpperCase();
+    return this.getCurrentUserName().charAt(0).toUpperCase();
   }
 
-  // After loading comments, compute top-level and set replies on each comment
-  processComments() {
-  // Map comments by id for quick lookup
-  const commentMap = new Map<number, CommentDto>();
-  this.comments.forEach(c => commentMap.set(c.id, c));
-
-  // Initialize replies array on each comment
-  this.comments.forEach(c => (c as any).replies = []);
-
-  // Build tree
-  this.topLevelComments = [];
-  this.comments.forEach(c => {
-    if (c.parentCommentId) {
-      const parent = commentMap.get(c.parentCommentId);
-      if (parent) {
-        (parent as any).replies.push(c);
+  processComments(): void {
+    const map = new Map<number, CommentDto>();
+    this.comments.forEach(c => map.set(c.id, c));
+    this.comments.forEach(c => (c.replies = []));
+    this.topLevelComments = [];
+    this.comments.forEach(c => {
+      if (c.parentCommentId) {
+        const p = map.get(c.parentCommentId);
+        if (p) (p.replies = p.replies || []).push(c);
+      } else {
+        this.topLevelComments.push(c);
       }
-    } else {
-      this.topLevelComments.push(c);
-    }
-  });
-}
+    });
+  }
 }

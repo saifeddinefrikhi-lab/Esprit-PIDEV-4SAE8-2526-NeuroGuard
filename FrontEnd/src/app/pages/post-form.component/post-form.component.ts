@@ -67,7 +67,10 @@ export class PostFormComponent implements OnInit {
 
     if (this.isEdit) {
       this.forumService.updatePost(this.postId!, request as UpdatePostRequest).subscribe({
-        next: () => this.router.navigate([this.getForumBasePath(), this.postId]),
+        next: () => {
+          this.loading = false;
+          this.router.navigate([this.getForumBasePath(), this.postId]);
+        },
         error: (err) => {
           this.error = 'Failed to update post.';
           this.loading = false;
@@ -75,7 +78,10 @@ export class PostFormComponent implements OnInit {
       });
     } else {
       this.forumService.createPost(request as CreatePostRequest).subscribe({
-        next: (post) => this.router.navigate([this.getForumBasePath(), post.id]),
+        next: (post) => {
+          this.loading = false;
+          this.router.navigate([this.getForumBasePath(), post.id]);
+        },
         error: (err) => {
           this.error = 'Failed to create post.';
           this.loading = false;
