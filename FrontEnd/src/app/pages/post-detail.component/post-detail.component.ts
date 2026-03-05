@@ -32,12 +32,14 @@ export class PostDetailComponent implements OnInit {
   postLoading = false;
   error = '';
   notFound = false;
+  uploadingImages = false;
+  imageUploadError = '';
   private userCache: Map<number, string> = new Map();
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private forumService: ForumService,
+    public forumService: ForumService,
     public authService: AuthService,
     private fb: FormBuilder,
     private userService: UserManagementService,
@@ -338,6 +340,41 @@ export class PostDetailComponent implements OnInit {
 
   getCurrentUserInitial(): string {
     return this.getCurrentUserName().charAt(0).toUpperCase();
+  }
+
+  onImagesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    if (!files?.length || !this.post) return;
+    this.imageUploadError = '';
+    this.uploadingImages = true;
+    this.cdr.markForCheck();
+    this.forumService.uploadPostImages(this.post.id, Array.from(files)).subscribe({
+      next: () => {
+        this.uploadingImages = false;
+        input.value = '';
+        this.loadPost(this.post!.id);
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.uploadingImages = false;
+        this.imageUploadError = err?.error?.message || err?.error || 'Failed to upload images. Max 5MB per file, JPEG/PNG/GIF/WebP only.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  deleteImage(index: number): void {
+    if (!this.post?.imageIds?.length || this.post.imageIds.length <= index || !confirm('Remove this image?')) return;
+    const imageId = this.post.imageIds[index];
+    this.forumService.deletePostImage(this.post.id, imageId).subscribe({
+      next: () => {
+        this.post!.imageUrls = this.post!.imageUrls?.filter((_, i) => i !== index) ?? [];
+        this.post!.imageIds = this.post!.imageIds?.filter((_, i) => i !== index) ?? [];
+        this.cdr.markForCheck();
+      },
+      error: () => alert('Failed to remove image.')
+    });
   }
 
   processComments(): void {

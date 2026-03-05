@@ -4,6 +4,7 @@ package com.neuroguard.forumsservice.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class PostResponse {
@@ -25,4 +26,6 @@ public class PostResponse {
     private String authorRole;   // e.g. PATIENT, PROVIDER, ADMIN
     private Double readabilityScore;  // Flesch Reading Ease 0–100
     private String readabilityLabel;   // Easy, Medium, Hard
+    private List<String> imageUrls;    // URLs to view post images (e.g. /api/posts/1/images/1/file)
+    private List<Long> imageIds;       // same order as imageUrls, for delete
 }

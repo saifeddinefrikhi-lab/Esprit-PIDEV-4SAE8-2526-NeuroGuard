@@ -3,14 +3,19 @@ package com.neuroguard.forumsservice.controller;
 import com.neuroguard.forumsservice.dto.PagedResponse;
 import com.neuroguard.forumsservice.dto.PostRequest;
 import com.neuroguard.forumsservice.dto.PostResponse;
+import com.neuroguard.forumsservice.service.PostImageService;
 import com.neuroguard.forumsservice.service.PostService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -20,6 +25,7 @@ import java.util.List;
 public class PostController {
 
     private final PostService postService;
+    private final PostImageService postImageService;
 
     private Long getCurrentUserId(HttpServletRequest request) {
         return (Long) request.getAttribute("userId");
@@ -127,5 +133,55 @@ public class PostController {
             HttpServletRequest request) {
         String role = getCurrentUserRole(request);
         return ResponseEntity.ok(postService.setPinned(id, pinned, role));
+    }
+
+    // Post images: upload, list, serve file, delete
+    @PostMapping("/{id:\\d+}/images")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<String>> uploadImages(
+            @PathVariable Long id,
+            @RequestParam("files") MultipartFile[] files,
+            HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        List<String> urls = postImageService.addImages(id, files, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(urls);
+    }
+
+    @GetMapping("/{id:\\d+}/images")
+    public ResponseEntity<List<String>> getImageUrls(@PathVariable Long id) {
+        return ResponseEntity.ok(postImageService.getImageUrls(id));
+    }
+
+    @GetMapping("/{id:\\d+}/images/{imageId:\\d+}/file")
+    public ResponseEntity<Resource> getImageFile(
+            @PathVariable Long id,
+            @PathVariable Long imageId) {
+        try {
+            Resource resource = postImageService.getImageFile(id, imageId);
+            String contentType = "image/jpeg";
+            String filename = resource.getFilename();
+            if (filename != null) {
+                if (filename.endsWith(".png")) contentType = "image/png";
+                else if (filename.endsWith(".gif")) contentType = "image/gif";
+                else if (filename.endsWith(".webp")) contentType = "image/webp";
+            }
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (filename != null ? filename : "image") + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id:\\d+}/images/{imageId:\\d+}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteImage(
+            @PathVariable Long id,
+            @PathVariable Long imageId,
+            HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
+        postImageService.deleteImage(id, imageId, userId);
+        return ResponseEntity.noContent().build();
     }
 }

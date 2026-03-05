@@ -68,6 +68,24 @@ export class ForumService {
     return this.http.put<PostDto>(`${this.baseUrl}/${id}/pin`, null, { params: { pinned: String(pinned) } });
   }
 
+  // Post images
+  uploadPostImages(postId: number, files: File[]): Observable<string[]> {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    return this.http.post<string[]>(`${this.baseUrl}/${postId}/images`, formData);
+  }
+
+  deletePostImage(postId: number, imageId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${postId}/images/${imageId}`);
+  }
+
+  /** Full URL for an image (API returns relative path). */
+  getPostImageUrl(relativeUrl: string): string {
+    if (!relativeUrl) return '';
+    const base = environment.apiUrl;
+    return relativeUrl.startsWith('/') ? `${base}${relativeUrl}` : `${base}/${relativeUrl}`;
+  }
+
   // ---------- Comments ----------
   getCommentsByPost(postId: number): Observable<CommentDto[]> {
     return this.http.get<CommentDto[]>(`${this.baseUrl}/${postId}/comments`);

@@ -87,6 +87,9 @@
 
       <!-- Post Content -->
       <div class="post-content">
+        <div *ngIf="post.imageUrls?.length" class="post-thumbnail-wrap" (click)="$event.stopPropagation()">
+          <img [src]="forumService.getPostImageUrl(post.imageUrls[0])" alt="" class="post-thumbnail">
+        </div>
         <h3 class="post-title">
           <span *ngIf="post.pinned" class="pinned-badge">Pinned</span>
           <span class="category-badge" [class.category-uncategorized]="!post.categoryName">{{ post.categoryName || 'Uncategorized' }}</span>

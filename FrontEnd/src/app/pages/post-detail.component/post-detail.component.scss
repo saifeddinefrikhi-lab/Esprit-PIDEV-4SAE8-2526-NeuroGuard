@@ -27,6 +27,19 @@
 .post-content .readability-meta { font-size: 0.875rem; color: #64748b; margin: 0 0 0.75rem 0; }
 .post-content .readability-meta strong { color: #059669; }
 
+.post-images { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+.post-image-wrap { position: relative; border-radius: 12px; overflow: hidden; max-width: 280px; }
+.post-image { display: block; width: 100%; height: auto; max-height: 240px; object-fit: cover; }
+.btn-delete-image { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 8px; border: none; background: rgba(0,0,0,0.5); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.btn-delete-image:hover { background: #dc2626; }
+.post-images-upload { margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.upload-label { cursor: pointer; }
+.upload-input { position: absolute; width: 0; height: 0; opacity: 0; }
+.upload-btn { display: inline-block; padding: 0.5rem 1rem; background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 10px; color: #475569; font-size: 0.9rem; font-weight: 500; }
+.upload-btn:hover { background: #e2e8f0; }
+.upload-error { font-size: 0.85rem; color: #dc2626; }
+.uploading { font-size: 0.85rem; color: #64748b; }
+
 .post-engagement { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding-top: 1rem; border-top: 1px solid #f1f5f9; }
 .engagement-stats { display: flex; gap: 1.5rem; }
 .engagement-stats .stat { display: flex; align-items: center; gap: 0.4rem; color: #64748b; font-size: 0.9rem; }

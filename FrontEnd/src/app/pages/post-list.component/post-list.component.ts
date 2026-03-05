@@ -36,7 +36,7 @@ export class PostListComponent implements OnInit {
   private userCache: Map<number, string> = new Map();
 
   constructor(
-    private forumService: ForumService,
+    public forumService: ForumService,
     public authService: AuthService,
     private router: Router,
     private cdr: ChangeDetectorRef,

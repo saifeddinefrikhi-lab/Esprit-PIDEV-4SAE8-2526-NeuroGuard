@@ -13,6 +13,7 @@ import com.neuroguard.forumsservice.repository.CategoryRepository;
 import com.neuroguard.forumsservice.repository.PostLikeRepository;
 import com.neuroguard.forumsservice.repository.PostRepository;
 import com.neuroguard.forumsservice.repository.PostShareRepository;
+import com.neuroguard.forumsservice.service.PostImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +39,7 @@ public class PostService {
     private final PostShareRepository postShareRepository;
     private final ProfanityFilterService profanityFilterService;
     private final ReadabilityService readabilityService;
+    private final PostImageService postImageService;
 
     @Transactional
     public PostResponse createPost(PostRequest request, Long authorId) {
@@ -241,6 +243,8 @@ public class PostService {
             response.setReadabilityScore(post.getReadabilityScore());
             response.setReadabilityLabel(readabilityService.getReadabilityLabel(post.getReadabilityScore()));
         }
+        response.setImageUrls(postImageService.getImageUrls(post.getId()));
+        response.setImageIds(postImageService.getImageIds(post.getId()));
         return response;
     }
 

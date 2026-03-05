@@ -25,6 +25,11 @@ eureka:
 server:
   port: 8085   # or any free port
 
+# Directory for post image uploads (relative to working dir or absolute)
+app:
+  upload:
+    dir: uploads/post-images
+
 jwt:
   secret: XDkzF2YNPA/7vXmPYJmaACjY6VBhwHJbr4pzPF5jguE=
 

@@ -63,6 +63,22 @@
         </h1>
         <p *ngIf="post.readabilityLabel" class="readability-meta">Readability: <strong>{{ post.readabilityLabel }}</strong><span *ngIf="post.readabilityScore != null"> ({{ post.readabilityScore | number:'1.0-0' }}/100)</span></p>
         <p class="post-body">{{ post.content }}</p>
+        <div *ngIf="post.imageUrls?.length" class="post-images">
+          <div *ngFor="let url of post.imageUrls; let i = index" class="post-image-wrap">
+            <img [src]="forumService.getPostImageUrl(url)" alt="Post image {{ i + 1 }}" class="post-image">
+            <button *ngIf="canEditPost()" type="button" (click)="deleteImage(i); $event.stopPropagation()" class="btn-delete-image" title="Remove image">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </div>
+        <div *ngIf="canEditPost()" class="post-images-upload">
+          <label class="upload-label">
+            <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple (change)="onImagesSelected($event)" #fileInput class="upload-input">
+            <span class="upload-btn">Add images</span>
+          </label>
+          <span *ngIf="imageUploadError" class="upload-error">{{ imageUploadError }}</span>
+          <span *ngIf="uploadingImages" class="uploading">Uploading...</span>
+        </div>
       </div>
 
       <div class="post-engagement">

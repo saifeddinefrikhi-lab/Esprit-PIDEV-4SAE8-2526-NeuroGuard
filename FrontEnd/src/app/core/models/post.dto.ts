@@ -17,6 +17,8 @@ export interface PostDto {
   authorRole?: string;  // e.g. PATIENT, PROVIDER, ADMIN
   readabilityScore?: number;   // Flesch Reading Ease 0–100
   readabilityLabel?: string;   // Easy, Medium, Hard
+  imageUrls?: string[];       // URLs to view post images
+  imageIds?: number[];        // same order as imageUrls, for delete
 }
 
 export interface CategoryDto {
