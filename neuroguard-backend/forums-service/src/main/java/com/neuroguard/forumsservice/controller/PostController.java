@@ -40,12 +40,23 @@ public class PostController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "newest") String sort,
+            @RequestParam(required = false) Long categoryId,
             HttpServletRequest request) {
         Long currentUserId = getCurrentUserId(request);
-        return ResponseEntity.ok(postService.getPostsPaged(page, size, sort, currentUserId));
+        return ResponseEntity.ok(postService.getPostsPaged(page, size, sort, currentUserId, categoryId));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/search")
+    public ResponseEntity<PagedResponse<PostResponse>> search(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            HttpServletRequest request) {
+        Long currentUserId = getCurrentUserId(request);
+        return ResponseEntity.ok(postService.search(q, page, size, currentUserId));
+    }
+
+    @GetMapping("/{id:\\d+}")
     public ResponseEntity<PostResponse> getPostById(@PathVariable Long id, HttpServletRequest request) {
         Long currentUserId = getCurrentUserId(request);
         return ResponseEntity.ok(postService.getPostById(id, currentUserId));
@@ -61,7 +72,7 @@ public class PostController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:\\d+}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PostResponse> updatePost(
             @PathVariable Long id,
@@ -72,7 +83,7 @@ public class PostController {
         return ResponseEntity.ok(postService.updatePost(id, request, userId, role));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\\d+}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> deletePost(
             @PathVariable Long id,
@@ -84,7 +95,7 @@ public class PostController {
     }
 
     // New endpoints for likes and shares
-    @PostMapping("/{id}/like")
+    @PostMapping("/{id:\\d+}/like")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> likePost(@PathVariable Long id, HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
@@ -92,7 +103,7 @@ public class PostController {
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/{id}/like")
+    @DeleteMapping("/{id:\\d+}/like")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> unlikePost(@PathVariable Long id, HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
@@ -100,11 +111,21 @@ public class PostController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/share")
+    @PostMapping("/{id:\\d+}/share")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> sharePost(@PathVariable Long id, HttpServletRequest request) {
         Long userId = getCurrentUserId(request);
         postService.sharePost(id, userId);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id:\\d+}/pin")
+    @PreAuthorize("isAuthenticated() and hasRole('ADMIN')")
+    public ResponseEntity<PostResponse> setPinned(
+            @PathVariable Long id,
+            @RequestParam boolean pinned,
+            HttpServletRequest request) {
+        String role = getCurrentUserRole(request);
+        return ResponseEntity.ok(postService.setPinned(id, pinned, role));
     }
 }

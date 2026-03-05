@@ -18,4 +18,5 @@ public class CommentResponse {
     private int likeCount;
     private int replyCount;                 // number of direct replies
     private boolean likedByCurrentUser;
+    private String authorRole;              // e.g. PATIENT, PROVIDER, ADMIN
 }

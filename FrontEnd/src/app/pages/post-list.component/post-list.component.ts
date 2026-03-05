@@ -1,8 +1,9 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ForumService } from '../../core/services/forum.service';
-import { PostDto } from '../../core/models/post.dto';
+import { PostDto, CategoryDto, DEFAULT_FORUM_CATEGORIES } from '../../core/models/post.dto';
 import { AuthService } from '../../core/services/auth.service';
 import { UserManagementService } from '../../core/services/user-management.service';
 import { asyncScheduler, observeOn, of, Observable, forkJoin, map, catchError } from 'rxjs';
@@ -10,7 +11,7 @@ import { asyncScheduler, observeOn, of, Observable, forkJoin, map, catchError } 
 @Component({
   selector: 'app-post-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './post-list.component.html',
   styleUrls: ['./post-list.component.scss']
 })
@@ -23,6 +24,9 @@ export class PostListComponent implements OnInit {
   totalElements = 0;
   pageSize = 10;
   sortOption = 'newest';
+  searchQuery = '';
+  selectedCategoryId: number | null = null;
+  categories: CategoryDto[] = [];
   readonly sortOptions: { value: string; label: string }[] = [
     { value: 'newest', label: 'Newest' },
     { value: 'oldest', label: 'Oldest' },
@@ -40,13 +44,28 @@ export class PostListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.loadCategories();
     this.loadPosts();
+  }
+
+  loadCategories(): void {
+    this.forumService.getCategories().subscribe({
+      next: (list) => {
+        this.categories = list?.length ? list : DEFAULT_FORUM_CATEGORIES;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.categories = DEFAULT_FORUM_CATEGORIES;
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   loadPosts(): void {
     this.loading = true;
     this.error = '';
-    this.forumService.getPostsPaged(this.currentPage, this.pageSize, this.sortOption).pipe(observeOn(asyncScheduler)).subscribe({
+    const categoryId = this.selectedCategoryId ?? undefined;
+    this.forumService.getPostsPaged(this.currentPage, this.pageSize, this.sortOption, categoryId).pipe(observeOn(asyncScheduler)).subscribe({
       next: (data) => {
         this.posts = data.content;
         this.totalElements = data.totalElements;
@@ -59,10 +78,14 @@ export class PostListComponent implements OnInit {
         // Fallback: try non-paged API when paged endpoint fails (e.g. gateway or backend issue)
         this.forumService.getAllPosts().pipe(observeOn(asyncScheduler)).subscribe({
           next: (data) => {
-            this.totalElements = data.length;
-            this.totalPages = Math.max(1, Math.ceil(data.length / this.pageSize));
+            let list = data;
+            if (this.selectedCategoryId != null) {
+              list = list.filter(p => p.categoryId === this.selectedCategoryId);
+            }
+            this.totalElements = list.length;
+            this.totalPages = Math.max(1, Math.ceil(list.length / this.pageSize));
             const start = this.currentPage * this.pageSize;
-            this.posts = data.slice(start, start + this.pageSize);
+            this.posts = list.slice(start, start + this.pageSize);
             this.resolvePostUsernames();
             this.loading = false;
             this.cdr.markForCheck();
@@ -87,6 +110,49 @@ export class PostListComponent implements OnInit {
     this.sortOption = value;
     this.currentPage = 0;
     this.loadPosts();
+  }
+
+  setCategory(id: number | null): void {
+    this.selectedCategoryId = id;
+    this.currentPage = 0;
+    this.loadPosts();
+  }
+
+  onCategoryChange(id: number | null): void {
+    this.currentPage = 0;
+    this.loadPosts();
+  }
+
+  runSearch(): void {
+    const q = (this.searchQuery || '').trim();
+    if (!q) {
+      this.loadPosts();
+      return;
+    }
+    this.loading = true;
+    this.error = '';
+    this.currentPage = 0;
+    this.forumService.searchPosts(q, 0, this.pageSize).pipe(observeOn(asyncScheduler)).subscribe({
+      next: (data) => {
+        this.posts = data.content;
+        this.totalElements = data.totalElements;
+        this.totalPages = data.totalPages;
+        this.resolvePostUsernames();
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.error = 'Search failed.';
+        this.loading = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  roleBadgeLabel(role: string | undefined): string {
+    if (!role) return '';
+    const labels: Record<string, string> = { ADMIN: 'Admin', PROVIDER: 'Provider', PATIENT: 'Patient', CAREGIVER: 'Caregiver' };
+    return labels[role] || role;
   }
 
   getPageNumbers(): number[] {
@@ -153,9 +219,27 @@ export class PostListComponent implements OnInit {
     this.router.navigate([this.getForumBasePath(), 'new']);
   }
 
+  isAdmin(): boolean {
+    return this.authService.currentUser?.role === 'ADMIN';
+  }
+
   canEditOrDelete(post: PostDto): boolean {
     const user = this.authService.currentUser;
     return user?.role === 'ADMIN' || user?.userId === post.authorId;
+  }
+
+  togglePin(post: PostDto, event: Event): void {
+    event.stopPropagation();
+    if (!this.isAdmin()) return;
+    const newPinned = !post.pinned;
+    this.forumService.setPinned(post.id, newPinned).subscribe({
+      next: (updated) => {
+        const i = this.posts.findIndex(p => p.id === post.id);
+        if (i !== -1) this.posts[i] = { ...this.posts[i], pinned: updated.pinned };
+        this.cdr.markForCheck();
+      },
+      error: () => alert('Failed to update pin.')
+    });
   }
 
   editPost(id: number, event: Event): void {

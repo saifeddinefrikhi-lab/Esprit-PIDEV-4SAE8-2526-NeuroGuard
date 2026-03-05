@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ForumService } from '../../core/services/forum.service';
-import { CreatePostRequest, UpdatePostRequest } from '../../core/models/post.dto';
+import { CreatePostRequest, UpdatePostRequest, CategoryDto, DEFAULT_FORUM_CATEGORIES } from '../../core/models/post.dto';
 import { AuthService } from '../../core/services/auth.service';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-post-form',
@@ -15,6 +16,7 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class PostFormComponent implements OnInit {
   postForm: FormGroup;
+  categories: CategoryDto[] = [];
   isEdit = false;
   postId?: number;
   loading = false;
@@ -25,15 +27,18 @@ export class PostFormComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private forumService: ForumService,
-    private authService: AuthService
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {
     this.postForm = this.fb.group({
       title: ['', [Validators.required, Validators.minLength(3)]],
-      content: ['', [Validators.required, Validators.minLength(10)]]
+      content: ['', [Validators.required, Validators.minLength(10)]],
+      categoryId: [null as number | null]
     });
   }
 
   ngOnInit(): void {
+    this.loadCategories();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit = true;
@@ -42,19 +47,39 @@ export class PostFormComponent implements OnInit {
     }
   }
 
+  loadCategories(): void {
+    this.forumService.getCategories().subscribe({
+      next: (list) => {
+        this.categories = list?.length ? list : DEFAULT_FORUM_CATEGORIES;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.categories = DEFAULT_FORUM_CATEGORIES;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   loadPost(): void {
     this.loading = true;
-    this.forumService.getPostById(this.postId!).subscribe({
+    this.error = '';
+    this.forumService.getPostById(this.postId!).pipe(
+      finalize(() => {
+        setTimeout(() => {
+          this.loading = false;
+          this.cdr.detectChanges();
+        }, 0);
+      })
+    ).subscribe({
       next: (post) => {
         this.postForm.patchValue({
           title: post.title,
-          content: post.content
+          content: post.content,
+          categoryId: post.categoryId ?? null
         });
-        this.loading = false;
       },
-      error: (err) => {
+      error: () => {
         this.error = 'Failed to load post.';
-        this.loading = false;
       }
     });
   }
@@ -63,28 +88,40 @@ export class PostFormComponent implements OnInit {
     if (this.postForm.invalid) return;
 
     this.loading = true;
-    const request = this.postForm.value;
+    this.error = '';
+    const raw = this.postForm.value;
+    const request = {
+      ...raw,
+      categoryId: raw.categoryId || undefined
+    };
+
+    const clearLoading = () => {
+      setTimeout(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      }, 0);
+    };
 
     if (this.isEdit) {
       this.forumService.updatePost(this.postId!, request as UpdatePostRequest).subscribe({
         next: () => {
-          this.loading = false;
+          clearLoading();
           this.router.navigate([this.getForumBasePath(), this.postId]);
         },
         error: (err) => {
-          this.error = 'Failed to update post.';
-          this.loading = false;
+          this.error = (err.error && typeof err.error === 'string') ? err.error : 'Failed to update post.';
+          clearLoading();
         }
       });
     } else {
       this.forumService.createPost(request as CreatePostRequest).subscribe({
         next: (post) => {
-          this.loading = false;
+          clearLoading();
           this.router.navigate([this.getForumBasePath(), post.id]);
         },
         error: (err) => {
-          this.error = 'Failed to create post.';
-          this.loading = false;
+          this.error = (err.error && typeof err.error === 'string') ? err.error : 'Failed to create post.';
+          clearLoading();
         }
       });
     }

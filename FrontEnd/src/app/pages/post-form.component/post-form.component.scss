@@ -139,6 +139,27 @@
         }
       }
 
+      .form-select {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        font-family: inherit;
+        font-size: 1rem;
+        color: #0f172a;
+        background: #fafbfc;
+        cursor: pointer;
+        &:focus {
+          outline: none;
+          border-color: #667eea;
+        }
+      }
+      .form-hint {
+        margin: 0.5rem 0 0;
+        font-size: 0.875rem;
+        color: #64748b;
+      }
+
       .textarea-wrapper {
         position: relative;
 

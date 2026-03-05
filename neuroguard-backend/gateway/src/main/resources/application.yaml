@@ -56,10 +56,14 @@ spring:
           uri: lb://medical-history-service
           predicates:
             - Path=/test
-        - id: forum-service
+        - id: forum-posts
           uri: lb://forum-service
           predicates:
-            - Path=/api/posts/**      # Matches all forum endpoints
+            - Path=/api/posts/**
+        - id: forum-categories
+          uri: lb://forum-service
+          predicates:
+            - Path=/api/categories/**
 
 logging:
   level:

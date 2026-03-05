@@ -26,6 +26,18 @@ public class Post {
     private String content;
     @Column(nullable = false)
     private Long authorId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    @Column(nullable = false)
+    private boolean pinned = false;
+
+    /** Flesch Reading Ease (0–100), higher = easier to read. Computed on create/update. */
+    @Column(name = "readability_score")
+    private Double readabilityScore;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
     @UpdateTimestamp

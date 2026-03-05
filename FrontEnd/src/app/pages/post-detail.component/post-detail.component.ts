@@ -188,7 +188,11 @@ export class PostDetailComponent implements OnInit {
         this.loading = false;
         this.cdr.markForCheck();
       },
-      error: () => { this.loading = false; this.cdr.markForCheck(); }
+      error: (err) => {
+        this.loading = false;
+        this.cdr.markForCheck();
+        alert((err?.error && typeof err.error === 'string') ? err.error : 'Failed to add comment.');
+      }
     });
   }
 
@@ -233,13 +237,29 @@ export class PostDetailComponent implements OnInit {
         this.replyForm.reset();
         this.cdr.markForCheck();
       },
-      error: () => alert('Failed to post reply.')
+      error: (err) => alert((err?.error && typeof err.error === 'string') ? err.error : 'Failed to post reply.')
     });
+  }
+
+  isAdmin(): boolean {
+    return this.authService.currentUser?.role === 'ADMIN';
   }
 
   canEditPost(): boolean {
     const u = this.authService.currentUser;
     return !!u && (u.role === 'ADMIN' || u.userId === this.post?.authorId);
+  }
+
+  togglePin(): void {
+    if (!this.post || !this.isAdmin()) return;
+    const newPinned = !this.post.pinned;
+    this.forumService.setPinned(this.post.id, newPinned).subscribe({
+      next: (updated) => {
+        this.post = { ...this.post!, pinned: updated.pinned };
+        this.cdr.markForCheck();
+      },
+      error: () => alert('Failed to update pin.')
+    });
   }
 
   editPost(): void {
@@ -282,7 +302,11 @@ export class PostDetailComponent implements OnInit {
         this.loading = false;
         this.cdr.markForCheck();
       },
-      error: () => { this.loading = false; this.cdr.markForCheck(); alert('Failed to update comment.'); }
+      error: (err) => {
+        this.loading = false;
+        this.cdr.markForCheck();
+        alert((err?.error && typeof err.error === 'string') ? err.error : 'Failed to update comment.');
+      }
     });
   }
 

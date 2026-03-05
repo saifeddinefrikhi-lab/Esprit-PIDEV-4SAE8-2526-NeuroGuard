@@ -12,6 +12,7 @@ export interface CommentDto {
   likedByCurrentUser?: boolean;
   /** Filled client-side when building comment tree */
   replies?: CommentDto[];
+  authorRole?: string;  // e.g. PATIENT, PROVIDER, ADMIN
 }
 
 export interface CreateCommentRequest {

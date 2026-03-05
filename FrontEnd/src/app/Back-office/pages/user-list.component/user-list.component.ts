@@ -1,13 +1,13 @@
 import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { UserManagementService } from '../../../core/services/user-management.service';
 import { UserDto } from '../../../core/models/user.dto';
 import { CreateUserRequest, UpdateUserRequest } from '../../../core/models/user-request.dto';
 
-
 @Component({
   selector: 'app-user-list',
+  standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './user-list.component.html',
   styleUrls: ['./user-list.component.scss'],
@@ -25,8 +25,10 @@ export class UserListComponent implements OnInit {
   searchQuery = '';
   selectedRole = '';
   exportPdfLoading = false;
+  fieldErrors: Record<string, string> = {};
+  /** Set true on first Save click so all invalid fields show errors at once */
+  formSubmitted = false;
 
-  // For create/edit form
   formData: CreateUserRequest = {
     firstName: '',
     lastName: '',
@@ -36,7 +38,10 @@ export class UserListComponent implements OnInit {
     password: ''
   };
 
-  constructor(private userService: UserManagementService, private cdr: ChangeDetectorRef) {}
+  constructor(
+    private userService: UserManagementService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     this.loadUsers();
@@ -49,7 +54,7 @@ export class UserListComponent implements OnInit {
         this.applyFilters();
         this.cdr.markForCheck();
       },
-      error: (err) => {
+      error: () => {
         this.errorMessage = 'Failed to load users';
         this.cdr.markForCheck();
       }
@@ -58,14 +63,13 @@ export class UserListComponent implements OnInit {
 
   applyFilters(): void {
     this.filteredUsers = this.users.filter(user => {
-      const matchesSearch = this.searchQuery === '' || 
-        user.username.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        user.firstName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(this.searchQuery.toLowerCase());
-      
-      const matchesRole = this.selectedRole === '' || user.role === this.selectedRole;
-      
+      const q = this.searchQuery.toLowerCase();
+      const matchesSearch = !this.searchQuery ||
+        user.username.toLowerCase().includes(q) ||
+        user.email.toLowerCase().includes(q) ||
+        (user.firstName || '').toLowerCase().includes(q) ||
+        (user.lastName || '').toLowerCase().includes(q);
+      const matchesRole = !this.selectedRole || user.role === this.selectedRole;
       return matchesSearch && matchesRole;
     });
     this.cdr.markForCheck();
@@ -89,8 +93,7 @@ export class UserListComponent implements OnInit {
     this.exportPdfLoading = true;
     this.errorMessage = '';
     this.cdr.markForCheck();
-    const roleParam = this.selectedRole?.trim() || undefined;
-    this.userService.getUsersPdf(roleParam).subscribe({
+    this.userService.getUsersPdf(this.selectedRole?.trim() || undefined).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -101,10 +104,7 @@ export class UserListComponent implements OnInit {
         this.exportPdfLoading = false;
         this.successMessage = 'PDF downloaded successfully.';
         this.cdr.markForCheck();
-        setTimeout(() => {
-          this.successMessage = '';
-          this.cdr.markForCheck();
-        }, 3000);
+        setTimeout(() => { this.successMessage = ''; this.cdr.markForCheck(); }, 3000);
       },
       error: () => {
         this.exportPdfLoading = false;
@@ -117,13 +117,15 @@ export class UserListComponent implements OnInit {
   openCreateForm(): void {
     this.selectedUser = null;
     this.isEditing = false;
+    this.formSubmitted = false;
     this.clearMessages();
+    this.fieldErrors = {};
     this.formData = {
       firstName: '',
       lastName: '',
       username: '',
       email: '',
-      role: 'PATIENT',
+      role: '',
       password: ''
     };
     this.showForm = true;
@@ -133,7 +135,9 @@ export class UserListComponent implements OnInit {
   openEditForm(user: UserDto): void {
     this.selectedUser = user;
     this.isEditing = true;
+    this.formSubmitted = false;
     this.clearMessages();
+    this.fieldErrors = {};
     this.formData = {
       firstName: user.firstName,
       lastName: user.lastName,
@@ -148,7 +152,9 @@ export class UserListComponent implements OnInit {
 
   closeForm(): void {
     this.showForm = false;
+    this.formSubmitted = false;
     this.clearMessages();
+    this.fieldErrors = {};
     this.isSubmitting = false;
     this.cdr.markForCheck();
   }
@@ -158,27 +164,42 @@ export class UserListComponent implements OnInit {
     this.errorMessage = '';
   }
 
-  saveUser(): void {
+  private setValidationErrors(err: any): void {
+    this.fieldErrors = {};
+    if (err?.error && typeof err.error === 'object' && !Array.isArray(err.error)) {
+      const map = err.error as Record<string, unknown>;
+      Object.keys(map).forEach(key => {
+        if (typeof map[key] === 'string') this.fieldErrors[key] = map[key] as string;
+      });
+      this.errorMessage = Object.values(this.fieldErrors)[0] || 'Please fix the errors below.';
+    } else {
+      this.errorMessage = typeof err?.error === 'string' ? err.error : (err?.message || 'Failed to save user. Please try again.');
+    }
+  }
+
+  saveUser(form: NgForm): void {
+    this.formSubmitted = true;
+    form.form.markAllAsTouched();
+    if (form.form.invalid) {
+      this.cdr.markForCheck();
+      return;
+    }
     this.clearMessages();
+    this.fieldErrors = {};
     this.isSubmitting = true;
     this.cdr.markForCheck();
 
     if (this.isEditing && this.selectedUser) {
       const updateData: UpdateUserRequest = { ...this.formData };
-      if (!updateData.password) {
-        delete updateData.password;
-      }
+      if (!updateData.password) delete updateData.password;
       this.userService.updateUser(this.selectedUser.id, updateData).subscribe({
         next: () => {
           this.successMessage = 'User updated successfully!';
-          setTimeout(() => {
-            this.loadUsers();
-            this.closeForm();
-          }, 800);
+          setTimeout(() => { this.loadUsers(); this.closeForm(); }, 800);
           this.cdr.markForCheck();
         },
         error: (err) => {
-          this.errorMessage = err.message || 'Failed to update user. Please try again.';
+          this.setValidationErrors(err);
           this.isSubmitting = false;
           this.cdr.markForCheck();
         }
@@ -187,14 +208,11 @@ export class UserListComponent implements OnInit {
       this.userService.createUser(this.formData).subscribe({
         next: () => {
           this.successMessage = 'User created successfully!';
-          setTimeout(() => {
-            this.loadUsers();
-            this.closeForm();
-          }, 800);
+          setTimeout(() => { this.loadUsers(); this.closeForm(); }, 800);
           this.cdr.markForCheck();
         },
         error: (err) => {
-          this.errorMessage = err.message || 'Failed to create user. Please try again.';
+          this.setValidationErrors(err);
           this.isSubmitting = false;
           this.cdr.markForCheck();
         }
@@ -203,20 +221,19 @@ export class UserListComponent implements OnInit {
   }
 
   deleteUser(id: number): void {
-    if (confirm('Are you sure you want to delete this user?')) {
-      this.userService.deleteUser(id).subscribe({
-        next: () => {
-          this.successMessage = 'User deleted successfully!';
-          this.loadUsers();
-          this.cdr.markForCheck();
-          setTimeout(() => this.clearMessages(), 3000);
-        },
-        error: (err) => {
-          this.errorMessage = err.message || 'Failed to delete user. Please try again.';
-          this.cdr.markForCheck();
-          setTimeout(() => this.clearMessages(), 3000);
-        }
-      });
-    }
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    this.userService.deleteUser(id).subscribe({
+      next: () => {
+        this.successMessage = 'User deleted successfully!';
+        this.loadUsers();
+        this.cdr.markForCheck();
+        setTimeout(() => this.clearMessages(), 3000);
+      },
+      error: (err) => {
+        this.errorMessage = err?.message || 'Failed to delete user.';
+        this.cdr.markForCheck();
+        setTimeout(() => this.clearMessages(), 3000);
+      }
+    });
   }
 }

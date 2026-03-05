@@ -26,9 +26,11 @@ public class CommentService {
     private final PostRepository postRepository;
     private final UserServiceClient userServiceClient;
     private final CommentLikeRepository commentLikeRepository;
+    private final ProfanityFilterService profanityFilterService;
 
     @Transactional
     public CommentResponse addComment(Long postId, CommentRequest request, Long authorId) {
+        profanityFilterService.validate(request.getContent());
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found"));
 
@@ -50,6 +52,7 @@ public class CommentService {
         if (!parent.getPost().getId().equals(postId)) {
             throw new RuntimeException("Parent comment does not belong to this post");
         }
+        profanityFilterService.validate(request.getContent());
         Comment reply = new Comment();
         reply.setContent(request.getContent());
         reply.setPost(post);
@@ -67,6 +70,7 @@ public class CommentService {
         if (!comment.getAuthorId().equals(currentUserId) && !"ADMIN".equals(currentUserRole)) {
             throw new RuntimeException("You are not authorized to update this comment");
         }
+        profanityFilterService.validate(request.getContent());
         comment.setContent(request.getContent());
         Comment saved = commentRepository.save(comment);
         return mapToResponse(saved, currentUserId);
@@ -133,10 +137,10 @@ public class CommentService {
         if (currentUserId != null) {
             response.setLikedByCurrentUser(commentLikeRepository.existsByCommentIdAndUserId(comment.getId(), currentUserId));
         }
-        // Fetch author username via Feign
         try {
             UserDto author = userServiceClient.getUserById(comment.getAuthorId());
             response.setAuthorUsername(author.getUsername());
+            response.setAuthorRole(author.getRole());
         } catch (Exception e) {
             response.setAuthorUsername("Unknown");
         }

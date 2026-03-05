@@ -19,4 +19,10 @@ public class PostResponse {
     private int shareCount;
     private boolean likedByCurrentUser;    // optional
     private boolean sharedByCurrentUser;   // optional
+    private boolean pinned;
+    private Long categoryId;
+    private String categoryName;
+    private String authorRole;   // e.g. PATIENT, PROVIDER, ADMIN
+    private Double readabilityScore;  // Flesch Reading Ease 0–100
+    private String readabilityLabel;   // Easy, Medium, Hard
 }
