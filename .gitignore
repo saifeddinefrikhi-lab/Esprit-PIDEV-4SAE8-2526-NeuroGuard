@@ -1,0 +1,29 @@
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Maven
+target/
+*.jar
+*.war
+
+# Node
+node_modules/
+dist/
+.angular/
+
+# OS
+Thumbs.db
+
+# Excluded from version control
+application-local.yml
+application-prod.yml
