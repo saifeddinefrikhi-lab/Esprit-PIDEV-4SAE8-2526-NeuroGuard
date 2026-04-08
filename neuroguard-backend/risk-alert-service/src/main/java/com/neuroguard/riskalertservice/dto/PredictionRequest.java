@@ -16,4 +16,23 @@ public class PredictionRequest {
     private int surgeryCount;
     private int caregiverCount;
     private int providerCount;
+
+    // ===== COGNITIVE AND HEALTH FIELDS FOR ML PREDICTION =====
+    private Integer mmse;
+    private Integer functionalAssessment;
+    private Integer adl;
+    private Boolean memoryComplaints;
+    private Boolean behavioralProblems;
+    private Boolean smoking;
+    private Boolean cardiovascularDisease;
+    private Boolean diabetes;
+    private Boolean depression;
+    private Boolean headInjury;
+    private Boolean hypertension;
+    private Integer alcoholConsumption;
+    private Integer physicalActivity;
+    private Integer dietQuality;
+    private Integer sleepQuality;
+    private Double bmi;
+    private Integer cholesterolTotal;
 }

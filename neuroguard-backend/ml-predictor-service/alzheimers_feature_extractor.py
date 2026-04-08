@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Union
 import json
+import re
 
 
 class AlzheimersFeatureExtractor:
@@ -121,7 +122,7 @@ class AlzheimersFeatureExtractor:
         # Core cognitive and functional features (most important)
         features['MMSE'] = self._extract_score(medical_record, ['MMSE', 'mmse'], min_val=0, max_val=30)
         features['FunctionalAssessment'] = self._extract_score(
-            medical_record, ['FunctionalAssessment', 'functional_assessment'], min_val=0, max_val=10
+            medical_record, ['FunctionalAssessment', 'functional_assessment', 'functionalAssessment'], min_val=0, max_val=10
         )
         features['ADL'] = self._extract_score(
             medical_record, ['ADL', 'adl', 'ActivitiesOfDailyLiving'], min_val=0, max_val=10
@@ -129,14 +130,15 @@ class AlzheimersFeatureExtractor:
         
         # Symptom flags
         features['MemoryComplaints'] = self._extract_boolean(
-            medical_record, ['MemoryComplaints', 'memory_complaints', 'memory_issues']
+            medical_record, ['MemoryComplaints', 'memory_complaints', 'memoryComplaints', 'memory_issues']
         )
         features['BehavioralProblems'] = self._extract_boolean(
-            medical_record, ['BehavioralProblems', 'behavioral_problems', 'behavior_issues']
+            medical_record, ['BehavioralProblems', 'behavioral_problems', 'behavioralProblems', 'behavior_issues']
         )
         
         # Demographics
-        if 'Age' in medical_record or 'age' in medical_record:
+        age_value = self._get_field(medical_record, ['Age', 'age'], default=None)
+        if age_value is not None:
             features['Age'] = self._extract_integer(medical_record, ['Age', 'age'], min_val=18, max_val=120)
         else:
             features['Age'] = 65  # default age estimate
@@ -146,13 +148,13 @@ class AlzheimersFeatureExtractor:
         # Health risk factors
         if self.feature_level in ['extended', 'full']:
             features['FamilyHistoryAlzheimers'] = self._extract_boolean(
-                medical_record, ['FamilyHistoryAlzheimers', 'family_history_alzheimers', 'family_history']
+                medical_record, ['FamilyHistoryAlzheimers', 'family_history_alzheimers', 'familyHistoryAlzheimers', 'family_history']
             )
             features['Smoking'] = self._extract_boolean(
                 medical_record, ['Smoking', 'smoking', 'smoker']
             )
             features['CardiovascularDisease'] = self._extract_boolean(
-                medical_record, ['CardiovascularDisease', 'cardiovascular_disease', 'heart_disease']
+                medical_record, ['CardiovascularDisease', 'cardiovascularDisease', 'cardiovascular_disease', 'heart_disease']
             )
             features['Diabetes'] = self._extract_boolean(
                 medical_record, ['Diabetes', 'diabetes', 'diabetic']
@@ -161,7 +163,7 @@ class AlzheimersFeatureExtractor:
                 medical_record, ['Depression', 'depression', 'depressed']
             )
             features['HeadInjury'] = self._extract_boolean(
-                medical_record, ['HeadInjury', 'head_injury', 'traumatic_brain_injury']
+                medical_record, ['HeadInjury', 'headInjury', 'head_injury', 'traumatic_brain_injury']
             )
             features['Hypertension'] = self._extract_boolean(
                 medical_record, ['Hypertension', 'hypertension', 'high_blood_pressure']
@@ -173,19 +175,19 @@ class AlzheimersFeatureExtractor:
                 medical_record, ['BMI', 'bmi', 'body_mass_index'], min_val=10, max_val=50
             )
             features['AlcoholConsumption'] = self._extract_score(
-                medical_record, ['AlcoholConsumption', 'alcohol_consumption'], min_val=0, max_val=10
+                medical_record, ['AlcoholConsumption', 'alcoholConsumption', 'alcohol_consumption'], min_val=0, max_val=10
             )
             features['PhysicalActivity'] = self._extract_score(
-                medical_record, ['PhysicalActivity', 'physical_activity'], min_val=0, max_val=10
+                medical_record, ['PhysicalActivity', 'physicalActivity', 'physical_activity'], min_val=0, max_val=10
             )
             features['DietQuality'] = self._extract_score(
-                medical_record, ['DietQuality', 'diet_quality'], min_val=0, max_val=10
+                medical_record, ['DietQuality', 'dietQuality', 'diet_quality'], min_val=0, max_val=10
             )
             features['SleepQuality'] = self._extract_score(
-                medical_record, ['SleepQuality', 'sleep_quality'], min_val=0, max_val=10
+                medical_record, ['SleepQuality', 'sleepQuality', 'sleep_quality'], min_val=0, max_val=10
             )
             features['CholesterolTotal'] = self._extract_score(
-                medical_record, ['CholesterolTotal', 'cholesterol_total'], min_val=0, max_val=300
+                medical_record, ['CholesterolTotal', 'cholesterolTotal', 'cholesterol_total'], min_val=0, max_val=300
             )
         
         return features
@@ -242,6 +244,10 @@ class AlzheimersFeatureExtractor:
         return {k: v for k, v in descriptions.items() if k in self.feature_names}
     
     # ===== Helper methods =====
+
+    def _normalize_key(self, key: str) -> str:
+        """Normalize field names for case/format-insensitive matching."""
+        return re.sub(r'[^a-z0-9]', '', str(key).strip().lower())
     
     def _get_field(self, record: Union[Dict, pd.Series], candidate_keys: List[str], default=None):
         """Get first non-empty value from candidate field names"""
@@ -250,6 +256,19 @@ class AlzheimersFeatureExtractor:
                 val = record[key]
                 if pd.notna(val) and str(val).strip() not in ['', 'nan', 'None', 'null']:
                     return val
+
+        # Fallback for key format differences (camelCase, snake_case, etc.)
+        normalized_record = {
+            self._normalize_key(k): v
+            for k, v in dict(record).items()
+        }
+        for key in candidate_keys:
+            normalized_key = self._normalize_key(key)
+            if normalized_key in normalized_record:
+                val = normalized_record[normalized_key]
+                if pd.notna(val) and str(val).strip() not in ['', 'nan', 'None', 'null']:
+                    return val
+
         return default
     
     def _extract_score(self, record: Union[Dict, pd.Series], keys: List[str],

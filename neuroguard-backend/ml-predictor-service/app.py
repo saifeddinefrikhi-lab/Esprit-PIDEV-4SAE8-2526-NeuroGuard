@@ -193,7 +193,7 @@ def health_check():
 def predict():
     """
     Predict Alzheimer's disease risk for a single patient
-    
+
     Expected JSON payload:
     {
         "patientId": "123",
@@ -219,15 +219,15 @@ def predict():
             'message': 'Please train the model first: python train_model.py',
             'status': 'service_unavailable'
         }), 503
-    
+
     try:
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
-        
+
         patient_id = data.get('patientId') or data.get('patient_id')
-        
+
         # Extract features
         try:
             features = feature_extractor.extract_features(data)
@@ -236,21 +236,26 @@ def predict():
                 'error': f'Feature extraction failed: {str(e)}',
                 'details': 'Check that required fields are provided with correct types'
             }), 400
-        
-        # Build feature vector in correct order
-        feature_vector = np.array([features.get(name, 0) for name in feature_names]).reshape(1, -1)
-        
-        # Scale features
+
+        # Build feature DataFrame with proper column names for consistent scaling
+        feature_dict = {name: features.get(name, 0) for name in feature_names}
+        feature_df = pd.DataFrame([feature_dict], columns=feature_names)
+
+        # Scale features using DataFrame (preserves feature names for scaler)
         if scaler:
-            feature_vector = scaler.transform(feature_vector)
-        
-        # Make prediction
-        probability = model.predict_proba(feature_vector)[0][1]
-        prediction = int(model.predict(feature_vector)[0])
-        
+            feature_scaled = scaler.transform(feature_df)
+            # Convert back to DataFrame with feature names for model
+            feature_df_scaled = pd.DataFrame(feature_scaled, columns=feature_names)
+        else:
+            feature_df_scaled = feature_df
+
+        # Make prediction with named DataFrame (model expects feature names)
+        probability = model.predict_proba(feature_df_scaled)[0][1]
+        prediction = int(model.predict(feature_df_scaled)[0])
+
         # Determine risk level
         risk_level = get_risk_level(probability)
-        
+
         response = {
             'patientId': patient_id,
             'prediction': prediction,
@@ -269,9 +274,9 @@ def predict():
                 }
             }
         }
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         traceback.print_exc()
         return jsonify({
@@ -284,7 +289,7 @@ def predict():
 def predict_batch():
     """
     Predict Alzheimer's disease risk for multiple patients
-    
+
     Expected JSON payload:
     {
         "patients": [
@@ -300,39 +305,44 @@ def predict_batch():
             'message': 'Please train the model first: python train_model.py',
             'status': 'service_unavailable'
         }), 503
-    
+
     try:
         data = request.get_json()
         patients = data.get('patients', [])
-        
+
         if not patients:
             return jsonify({'error': 'No patients data provided'}), 400
-        
+
         if not isinstance(patients, list):
             return jsonify({'error': 'patients must be a list'}), 400
-        
+
         results = []
         errors = []
-        
+
         for idx, patient_data in enumerate(patients):
             try:
                 patient_id = patient_data.get('patientId') or patient_data.get('patient_id')
-                
+
                 # Extract features
                 features = feature_extractor.extract_features(patient_data)
-                
-                # Build feature vector
-                feature_vector = np.array([features.get(name, 0) for name in feature_names]).reshape(1, -1)
-                
-                # Scale features
+
+                # Build feature DataFrame with proper column names (consistent)
+                feature_dict = {name: features.get(name, 0) for name in feature_names}
+                feature_df = pd.DataFrame([feature_dict], columns=feature_names)
+
+                # Scale features using DataFrame
                 if scaler:
-                    feature_vector = scaler.transform(feature_vector)
-                
-                # Predict
-                probability = model.predict_proba(feature_vector)[0][1]
-                prediction = int(model.predict(feature_vector)[0])
+                    feature_scaled = scaler.transform(feature_df)
+                    # Convert back to DataFrame with feature names for model
+                    feature_df_scaled = pd.DataFrame(feature_scaled, columns=feature_names)
+                else:
+                    feature_df_scaled = feature_df
+
+                # Predict with named DataFrame
+                probability = model.predict_proba(feature_df_scaled)[0][1]
+                prediction = int(model.predict(feature_df_scaled)[0])
                 risk_level = get_risk_level(probability)
-                
+
                 results.append({
                     'patientId': patient_id,
                     'prediction': prediction,
@@ -341,26 +351,26 @@ def predict_batch():
                     'riskLevel': risk_level,
                     'recommendation': get_recommendation(risk_level, probability)
                 })
-            
+
             except Exception as e:
                 errors.append({
                     'patient_index': idx,
                     'patientId': patient_data.get('patientId') or patient_data.get('patient_id'),
                     'error': str(e)
                 })
-        
+
         response = {
             'predictions': results,
             'totalPatients': len(patients),
             'successfulPredictions': len(results),
             'failedPredictions': len(errors)
         }
-        
+
         if errors:
             response['errors'] = errors
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         traceback.print_exc()
         return jsonify({
