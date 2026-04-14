@@ -66,6 +66,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Log userId extraction status
+            if (userId == null) {
+                log.warn("UserId is null for user: {} at {} {}", username, method, path);
+            }
+
             String normalizedRole = role.startsWith("ROLE_") ? role.substring(5) : role;
 
             log.debug("JWT Filter - {} {} - Username: {}, Role: {}, UserId: {}", method, path, username, role, userId);

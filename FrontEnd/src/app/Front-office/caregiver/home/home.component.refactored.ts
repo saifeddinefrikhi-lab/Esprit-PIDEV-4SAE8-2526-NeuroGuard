@@ -7,10 +7,6 @@ import { StatisticsService, CaregiverStatisticsDTO } from 'src/app/core/services
 import { IconService, IconDirective } from '@ant-design/icons-angular';
 import { RiseOutline, FallOutline } from '@ant-design/icons-angular/icons';
 import { CardComponent } from 'src/app/theme/shared/components/card/card.component';
-import { AlertTrendsChartComponent } from 'src/app/theme/shared/apexchart/alert-trends-chart/alert-trends-chart.component';
-import { ProgressionChartComponent } from 'src/app/theme/shared/apexchart/progression-chart/progression-chart.component';
-import { HealthRiskChartComponent } from 'src/app/theme/shared/apexchart/health-risk-chart/health-risk-chart.component';
-import { CognitiveAssessmentChartComponent } from 'src/app/theme/shared/apexchart/cognitive-assessment-chart/cognitive-assessment-chart.component';
 
 interface ChartPoint {
   label: string;
@@ -26,15 +22,7 @@ interface ChartPoint {
  */
 @Component({
   selector: 'app-home',
-  imports: [
-    CommonModule,
-    CardComponent,
-    IconDirective,
-    AlertTrendsChartComponent,
-    ProgressionChartComponent,
-    HealthRiskChartComponent,
-    CognitiveAssessmentChartComponent
-  ],
+  imports: [CommonModule, CardComponent, IconDirective],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
@@ -48,20 +36,6 @@ export class HomeComponent implements OnInit {
   }
 
   loadingStats = true;
-
-  // Chart data properties
-  criticalAlertsCount: number = 0;
-  warningAlertsCount: number = 0;
-  infoAlertsCount: number = 0;
-  mildCasesCount: number = 0;
-  moderateCasesCount: number = 0;
-  severeCasesCount: number = 0;
-
-  // New chart data properties
-  averageMMSE: number = 0;
-  averageFunctionalAssessment: number = 0;
-  averageADL: number = 0;
-  patientsWithHighRisk: number = 0;
 
   AnalyticEcommerce = [
     { title: 'Assigned Patients', amount: '0', background: 'bg-light-primary', border: 'border-primary', icon: 'rise', percentage: '0%', color: 'text-primary', number: 'Under follow-up', note: 'Patients assigned to caregiver' },
@@ -116,18 +90,6 @@ export class HomeComponent implements OnInit {
     const pendingRate = this.calculatePercent(stats.pendingAlerts, stats.totalAlerts);
     const criticalRate = this.calculatePercent(stats.criticalAlerts, stats.totalAlerts);
 
-    // Set chart data from backend statistics
-    this.criticalAlertsCount = stats.criticalAlerts;
-    this.warningAlertsCount = stats.warningAlerts;
-    this.infoAlertsCount = stats.infoAlerts;
-    this.mildCasesCount = stats.mildCases;
-    this.moderateCasesCount = stats.moderateCases;
-    this.severeCasesCount = stats.severeCases;
-    this.averageMMSE = stats.averageMMSE;
-    this.averageFunctionalAssessment = stats.averageFunctionalAssessment;
-    this.averageADL = stats.averageADL;
-    this.patientsWithHighRisk = stats.patientsWithLowMMSE + stats.patientsWithCognitiveDifficultyOptions;
-
     this.AnalyticEcommerce = [
       {
         title: 'Assigned Patients',
@@ -172,53 +134,28 @@ export class HomeComponent implements OnInit {
         color: 'text-danger',
         number: 'Critical unresolved alerts',
         note: 'Highest urgency patient risks'
-      },
-      // New cards
-      {
-        title: 'High-Risk Patients',
-        amount: String(this.patientsWithHighRisk),
-        background: 'bg-light-danger',
-        border: 'border-danger',
-        icon: 'fall',
-        percentage: `${this.calculatePercent(this.patientsWithHighRisk, stats.totalAssignedPatients)}%`,
-        color: 'text-danger',
-        number: 'Low MMSE or cognitive difficulty',
-        note: 'Patients requiring immediate attention'
-      },
-      {
-        title: 'Unresolved Critical',
-        amount: String(stats.unresolvedCriticalAlerts),
-        background: 'bg-light-danger',
-        border: 'border-danger',
-        icon: 'fall',
-        percentage: `${stats.criticalAlertRate.toFixed(1)}%`,
-        color: 'text-danger',
-        number: 'Critical alert rate',
-        note: 'Percentage of unresolved critical alerts'
-      },
-      {
-        title: 'Alert Resolution',
-        amount: `${stats.alertResolutionRate.toFixed(1)}%`,
-        background: 'bg-light-success',
-        border: 'border-success',
-        icon: 'rise',
-        percentage: `${stats.resolvedAlerts}/${stats.totalAlerts}`,
-        color: 'text-success',
-        number: 'Alerts resolved',
-        note: 'Alert resolution effectiveness'
-      },
-      {
-        title: 'Patient Health Status',
-        amount: String(stats.mildCases),
-        background: 'bg-light-info',
-        border: 'border-info',
-        icon: 'rise',
-        percentage: `${this.calculatePercent(stats.mildCases, stats.totalAssignedPatients)}%`,
-        color: 'text-info',
-        number: 'Mild progression',
-        note: 'Patients with mild progression status'
       }
     ];
+
+    // Build severity chart
+    this.severityChart = this.buildChart([
+      { label: 'Critical', value: stats.criticalAlerts, colorClass: 'bg-danger' },
+      { label: 'Warning', value: stats.warningAlerts, colorClass: 'bg-warning' },
+      { label: 'Info', value: stats.infoAlerts, colorClass: 'bg-info' }
+    ]);
+
+    // Build status chart
+    this.statusChart = this.buildChart([
+      { label: 'Pending', value: stats.pendingAlerts, colorClass: 'bg-warning' },
+      { label: 'Resolved', value: stats.resolvedAlerts, colorClass: 'bg-success' }
+    ]);
+
+    // Build progression chart
+    this.progressionChart = this.buildChart([
+      { label: 'Mild', value: stats.mildCases, colorClass: 'bg-primary' },
+      { label: 'Moderate', value: stats.moderateCases, colorClass: 'bg-warning' },
+      { label: 'Severe', value: stats.severeCases, colorClass: 'bg-danger' }
+    ]);
   }
 
   private buildChart(series: Array<{ label: string; value: number; colorClass: string }>): ChartPoint[] {

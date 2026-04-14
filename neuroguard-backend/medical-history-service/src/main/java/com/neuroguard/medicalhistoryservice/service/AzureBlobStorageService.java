@@ -3,8 +3,8 @@ package com.neuroguard.medicalhistoryservice.service;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +18,9 @@ import java.util.List;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AzureBlobStorageService {
 
-    private final BlobServiceClient blobServiceClient;
+    private BlobServiceClient blobServiceClient;
 
     @Value("${azure.storage.container-name:medical-records}")
     private String containerName;
@@ -31,6 +30,11 @@ public class AzureBlobStorageService {
 
     @Value("${azure.storage.enabled:true}")
     private boolean azureStorageEnabled;
+
+    @Autowired(required = false)
+    public void setBlobServiceClient(BlobServiceClient blobServiceClient) {
+        this.blobServiceClient = blobServiceClient;
+    }
 
     /**
      * Upload a file to Azure Blob Storage

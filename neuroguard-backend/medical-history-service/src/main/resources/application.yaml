@@ -52,7 +52,7 @@ azure:
     connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
     container-name: medical-records
     cdn-endpoint-url: ${AZURE_CDN_ENDPOINT_URL:}
-    enabled: true  # Enable Azure storage (env vars will be loaded from .env)
+    enabled: false  # Disabled for development - set AZURE_STORAGE_CONNECTION_STRING to enable
 
 # Feign client configuration for user-service
 user-service:

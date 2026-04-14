@@ -7,10 +7,6 @@ import { StatisticsService, PatientStatisticsDTO } from 'src/app/core/services/s
 import { IconService, IconDirective } from '@ant-design/icons-angular';
 import { RiseOutline, FallOutline } from '@ant-design/icons-angular/icons';
 import { CardComponent } from 'src/app/theme/shared/components/card/card.component';
-import { AlertTrendsChartComponent } from 'src/app/theme/shared/apexchart/alert-trends-chart/alert-trends-chart.component';
-import { AlertStatusChartComponent } from 'src/app/theme/shared/apexchart/alert-status-chart/alert-status-chart.component';
-import { HealthRiskChartComponent } from 'src/app/theme/shared/apexchart/health-risk-chart/health-risk-chart.component';
-import { CognitiveAssessmentChartComponent } from 'src/app/theme/shared/apexchart/cognitive-assessment-chart/cognitive-assessment-chart.component';
 
 interface ChartPoint {
   label: string;
@@ -26,15 +22,7 @@ interface ChartPoint {
  */
 @Component({
   selector: 'app-home',
-  imports: [
-    CommonModule,
-    CardComponent,
-    IconDirective,
-    AlertTrendsChartComponent,
-    AlertStatusChartComponent,
-    HealthRiskChartComponent,
-    CognitiveAssessmentChartComponent
-  ],
+  imports: [CommonModule, CardComponent, IconDirective],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
@@ -48,23 +36,6 @@ export class HomeComponent implements OnInit {
   }
 
   loadingStats = true;
-
-  // Chart data properties
-  criticalAlertsCount: number = 0;
-  warningAlertsCount: number = 0;
-  infoAlertsCount: number = 0;
-  resolvedAlertsCount: number = 0;
-  pendingAlertsCount: number = 0;
-
-  // New chart data properties
-  averageMMSE: number = 0;
-  geneticRiskCount: number = 0;
-  smokingCount: number = 0;
-  cardiovascularCount: number = 0;
-  diabetesCount: number = 0;
-  depressionCount: number = 0;
-  comorbidityCount: number = 0;
-  allergieCount: number = 0;
 
   AnalyticEcommerce = [
     { title: 'Medical History Status', amount: 'Unknown', background: 'bg-light-primary', border: 'border-primary', icon: 'rise', percentage: '0%', color: 'text-primary', number: 'Profile completeness', note: 'Availability of personal medical history' },
@@ -115,27 +86,6 @@ export class HomeComponent implements OnInit {
    * All calculations and joins were done on backend
    */
   private updatePatientStats(stats: PatientStatisticsDTO): void {
-    // Set chart data from backend statistics
-    this.criticalAlertsCount = stats.criticalAlerts;
-    this.warningAlertsCount = stats.warningAlerts;
-    this.infoAlertsCount = stats.infoAlerts;
-    this.resolvedAlertsCount = stats.resolvedAlerts;
-    this.pendingAlertsCount = stats.pendingAlerts;
-
-    // Set new chart data
-    this.averageMMSE = stats.mmse || 0;
-    this.comorbidityCount = stats.comorbiditiesCount;
-    this.allergieCount = stats.medicationAllergiesCount + stats.foodAllergiesCount + stats.environmentalAllergiesCount;
-    this.geneticRiskCount = stats.geneticRisk ? 1 : 0;
-    this.smokingCount = stats.smoking ? 1 : 0;
-    this.cardiovascularCount = stats.cardiovascularDisease ? 1 : 0;
-    this.diabetesCount = stats.diabetes ? 1 : 0;
-    this.depressionCount = stats.depression ? 1 : 0;
-
-    const historyCoverage = stats.hasMedicalHistory ? 100 : 0;
-    const pendingRate = this.calculatePercent(stats.pendingAlerts, stats.totalAlerts);
-    const criticalRate = this.calculatePercent(stats.criticalAlerts, stats.totalAlerts);
-
     this.AnalyticEcommerce = [
       {
         title: 'Medical History Status',
@@ -165,7 +115,7 @@ export class HomeComponent implements OnInit {
         background: 'bg-light-warning',
         border: 'border-warning',
         icon: 'fall',
-        percentage: `${pendingRate}%`,
+        percentage: `${this.calculatePercent(stats.pendingAlerts, stats.totalAlerts)}%`,
         color: 'text-warning',
         number: 'Unresolved notifications',
         note: 'Alerts requiring your attention'
@@ -176,78 +126,33 @@ export class HomeComponent implements OnInit {
         background: 'bg-light-danger',
         border: 'border-danger',
         icon: 'fall',
-        percentage: `${criticalRate}%`,
+        percentage: `${this.calculatePercent(stats.criticalAlerts, stats.totalAlerts)}%`,
         color: 'text-danger',
         number: 'Critical unresolved alerts',
         note: 'Highest urgency risks'
-      },
-      // New cards
-      {
-        title: 'Health Risk Profile',
-        amount: String(stats.totalRiskFactors),
-        background: 'bg-light-info',
-        border: 'border-info',
-        icon: 'rise',
-        percentage: stats.totalRiskFactors > 0 ? 'Active' : 'None',
-        color: 'text-info',
-        number: 'Total risk factors',
-        note: 'Comorbidities and allergies count'
-      },
-      {
-        title: 'Cognitive Health',
-        amount: String(stats.mmse !== null && stats.mmse !== undefined ? stats.mmse : 'N/A'),
-        background: this.getCognitiveBackground(stats.mmse),
-        border: this.getCognitiveBorder(stats.mmse),
-        icon: 'rise',
-        percentage: stats.mmse !== null && stats.mmse !== undefined ? `${Math.round((stats.mmse / 30) * 100)}%` : 'N/A',
-        color: this.getCognitiveColor(stats.mmse),
-        number: 'MMSE Score',
-        note: 'Cognitive assessment (0-30 scale)'
-      },
-      {
-        title: 'Health Conditions',
-        amount: String(stats.healthConditionCount),
-        background: 'bg-light-warning',
-        border: 'border-warning',
-        icon: stats.healthConditionCount > 0 ? 'fall' : 'rise',
-        percentage: stats.healthConditionCount > 0 ? 'Active' : 'None',
-        color: 'text-warning',
-        number: 'Chronic conditions',
-        note: 'Genetic, cardiovascular, diabetes, etc.'
-      },
-      {
-        title: 'Medical History',
-        amount: stats.hasMedicalHistory ? 'Complete' : 'Incomplete',
-        background: 'bg-light-success',
-        border: 'border-success',
-        icon: stats.hasMedicalHistory ? 'rise' : 'fall',
-        percentage: `${historyCoverage}%`,
-        color: 'text-success',
-        number: 'Record status',
-        note: 'Medical history coverage'
       }
     ];
-  }
 
-  private getCognitiveBackground(mmse: number | null | undefined): string {
-    if (mmse === null || mmse === undefined) return 'bg-light-muted';
-    if (mmse < 18) return 'bg-light-danger';
-    if (mmse < 23) return 'bg-light-warning';
-    return 'bg-light-success';
-  }
+    // Build severity chart
+    this.severityChart = this.buildChart([
+      { label: 'Critical', value: stats.criticalAlerts, colorClass: 'bg-danger' },
+      { label: 'Warning', value: stats.warningAlerts, colorClass: 'bg-warning' },
+      { label: 'Info', value: stats.infoAlerts, colorClass: 'bg-info' }
+    ]);
 
-  private getCognitiveBorder(mmse: number | null | undefined): string {
-    if (mmse === null || mmse === undefined) return 'border-muted';
-    if (mmse < 18) return 'border-danger';
-    if (mmse < 23) return 'border-warning';
-    return 'border-success';
-  }
+    // Build status chart
+    this.statusChart = this.buildChart([
+      { label: 'Pending', value: stats.pendingAlerts, colorClass: 'bg-warning' },
+      { label: 'Resolved', value: stats.resolvedAlerts, colorClass: 'bg-success' }
+    ]);
 
-  private getCognitiveColor(mmse: number | null | undefined): string {
-    if (mmse === null || mmse === undefined) return 'text-muted';
-    if (mmse < 18) return 'text-danger';
-    if (mmse < 23) return 'text-warning';
-    return 'text-success';
+    // Build risk factor chart
+    this.riskFactorChart = this.buildChart([
+      { label: 'Comorbidities', value: stats.comorbiditiesCount, colorClass: 'bg-primary' },
+      { label: 'Medication Allergies', value: stats.medicationAllergiesCount, colorClass: 'bg-info' },
+      { label: 'Food Allergies', value: stats.foodAllergiesCount, colorClass: 'bg-warning' },
+      { label: 'Environmental Allergies', value: stats.environmentalAllergiesCount, colorClass: 'bg-danger' }
+    ]);
   }
 
   private buildChart(series: Array<{ label: string; value: number; colorClass: string }>): ChartPoint[] {

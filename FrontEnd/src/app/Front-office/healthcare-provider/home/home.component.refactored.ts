@@ -7,10 +7,6 @@ import { StatisticsService, ProviderStatisticsDTO } from 'src/app/core/services/
 import { IconService, IconDirective } from '@ant-design/icons-angular';
 import { RiseOutline, FallOutline } from '@ant-design/icons-angular/icons';
 import { CardComponent } from 'src/app/theme/shared/components/card/card.component';
-import { AlertTrendsChartComponent } from 'src/app/theme/shared/apexchart/alert-trends-chart/alert-trends-chart.component';
-import { ProgressionChartComponent } from 'src/app/theme/shared/apexchart/progression-chart/progression-chart.component';
-import { HealthRiskChartComponent } from 'src/app/theme/shared/apexchart/health-risk-chart/health-risk-chart.component';
-import { CognitiveAssessmentChartComponent } from 'src/app/theme/shared/apexchart/cognitive-assessment-chart/cognitive-assessment-chart.component';
 
 interface ChartPoint {
   label: string;
@@ -26,15 +22,7 @@ interface ChartPoint {
  */
 @Component({
   selector: 'app-home',
-  imports: [
-    CommonModule,
-    CardComponent,
-    IconDirective,
-    AlertTrendsChartComponent,
-    ProgressionChartComponent,
-    HealthRiskChartComponent,
-    CognitiveAssessmentChartComponent
-  ],
+  imports: [CommonModule, CardComponent, IconDirective],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
@@ -48,22 +36,6 @@ export class HomeComponent implements OnInit {
   }
 
   loadingStats = true;
-
-  // Chart data properties
-  criticalAlertsCount: number = 0;
-  warningAlertsCount: number = 0;
-  infoAlertsCount: number = 0;
-  mildCasesCount: number = 0;
-  moderateCasesCount: number = 0;
-  severeCasesCount: number = 0;
-
-  // New chart data properties
-  averageMMSE: number = 0;
-  averageFunctionalAssessment: number = 0;
-  averageADL: number = 0;
-  patientsWithGeneticRisk: number = 0;
-  patientsWithComorbidities: number = 0;
-  patientsWithAllergies: number = 0;
 
   AnalyticEcommerce = [
     { title: 'Medical Histories', amount: '0', background: 'bg-light-primary', border: 'border-primary', icon: 'rise', percentage: '0%', color: 'text-primary', number: 'Provider records', note: 'Total recorded medical histories' },
@@ -117,21 +89,6 @@ export class HomeComponent implements OnInit {
     const severeCaseRate = this.calculatePercent(stats.severeCases, stats.totalPatients);
     const pendingRate = this.calculatePercent(stats.pendingAlerts, stats.totalAlerts);
     const criticalRate = this.calculatePercent(stats.criticalAlerts, stats.totalAlerts);
-    const healthRiskRate = this.calculatePercent(stats.patientsWithHealthRisks, stats.totalPatients);
-
-    // Set chart data from backend statistics
-    this.criticalAlertsCount = stats.criticalAlerts;
-    this.warningAlertsCount = stats.warningAlerts;
-    this.infoAlertsCount = stats.infoAlerts;
-    this.mildCasesCount = stats.mildCases;
-    this.moderateCasesCount = stats.moderateCases;
-    this.severeCasesCount = stats.severeCases;
-    this.averageMMSE = stats.averageMMSE;
-    this.averageFunctionalAssessment = stats.averageFunctionalAssessment;
-    this.averageADL = stats.averageADL;
-    this.patientsWithGeneticRisk = Math.round(stats.patientsWithGeneticRisk);
-    this.patientsWithComorbidities = stats.patientsWithComorbidities;
-    this.patientsWithAllergies = stats.patientsWithAllergies;
 
     this.AnalyticEcommerce = [
       {
@@ -177,55 +134,10 @@ export class HomeComponent implements OnInit {
         color: 'text-danger',
         number: 'Critical unresolved alerts',
         note: 'Highest urgency risks'
-      },
-      // New cards
-      {
-        title: 'Patients with Health Risks',
-        amount: String(stats.patientsWithHealthRisks),
-        background: 'bg-light-danger',
-        border: 'border-danger',
-        icon: 'fall',
-        percentage: `${healthRiskRate}%`,
-        color: 'text-danger',
-        number: 'At-risk population',
-        note: 'Patients with comorbidities or genetic risk'
-      },
-      {
-        title: 'Average Cognitive Score',
-        amount: stats.averageMMSE.toFixed(1),
-        background: 'bg-light-info',
-        border: 'border-info',
-        icon: 'rise',
-        percentage: `${Math.round((stats.averageMMSE / 30) * 100)}%`,
-        color: 'text-info',
-        number: 'MMSE (0-30)',
-        note: 'Population cognitive health'
-      },
-      {
-        title: 'High-Risk Patient Count',
-        amount: String(stats.totalPatients - stats.mildCases),
-        background: 'bg-light-warning',
-        border: 'border-warning',
-        icon: 'fall',
-        percentage: `${this.calculatePercent(stats.totalPatients - stats.mildCases, stats.totalPatients)}%`,
-        color: 'text-warning',
-        number: 'Moderate + Severe',
-        note: 'Patients beyond mild progression'
-      },
-      {
-        title: 'Patient Health Risk Load',
-        amount: stats.averageRiskFactors.toFixed(1),
-        background: 'bg-light-orange',
-        border: 'border-orange',
-        icon: 'fall',
-        percentage: Math.round(stats.patientsWithComorbidities + stats.patientsWithAllergies) + ' patients',
-        color: 'text-orange',
-        number: 'Avg conditions',
-        note: 'Average health conditions per patient'
       }
     ];
 
-    // Build severity chart - using existing chart rendering
+    // Build severity chart
     this.severityChart = this.buildChart([
       { label: 'Critical', value: stats.criticalAlerts, colorClass: 'bg-danger' },
       { label: 'Warning', value: stats.warningAlerts, colorClass: 'bg-warning' },
