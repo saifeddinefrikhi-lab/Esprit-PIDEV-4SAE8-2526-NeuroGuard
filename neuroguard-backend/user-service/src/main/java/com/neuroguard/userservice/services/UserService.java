@@ -9,9 +9,10 @@ import com.neuroguard.userservice.entities.User;
 import com.neuroguard.userservice.security.JwtUtils;
 import com.neuroguard.userservice.repositories.PasswordResetTokenRepository;
 import com.neuroguard.userservice.repositories.UserRepository;
-import com.neuroguard.userservice.services.PasswordResetService;
+import com.neuroguard.userservice.events.UserCreatedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -40,7 +41,7 @@ public class UserService implements UserDetailsService {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    private PasswordResetService passwordResetService;
+    private ApplicationEventPublisher eventPublisher;
 
     // Register a new user
     public String registerUser(User user) {
@@ -132,13 +133,8 @@ public class UserService implements UserDetailsService {
         log.info("Creating new user via Admin: {}", request.getEmail());
         User saved = userRepository.saveAndFlush(user);
         
-        // Trigger invitation email via password reset link (Exactly like Forgot Password feature)
-        try {
-            String result = passwordResetService.processForgotPassword(request.getEmail());
-            log.info("Invitation result for {}: {}", request.getEmail(), result);
-        } catch (Exception e) {
-            log.error("CRITICAL: Failed to send invitation email for {}", request.getEmail(), e);
-        }
+        // Trigger invitation flow via event (Decoupled to fix circular dependencies)
+        eventPublisher.publishEvent(new UserCreatedEvent(this, saved.getEmail()));
         
         return convertToDto(saved);
     }
