@@ -74,6 +74,17 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Get all healthcare providers (doctors, nurses)
+     * Accessible to PATIENT role for booking reservations
+     */
+    @GetMapping("/providers")
+    public ResponseEntity<List<UserDto>> getAllProviders() {
+        List<User> providers = userRepository.findByRole(Role.PROVIDER);
+        List<UserDto> dtos = providers.stream().map(this::convertToDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
     // Helper method to convert User to UserDto (inclut lat/lon)
     private UserDto convertToDto(User user) {
         UserDto dto = new UserDto();

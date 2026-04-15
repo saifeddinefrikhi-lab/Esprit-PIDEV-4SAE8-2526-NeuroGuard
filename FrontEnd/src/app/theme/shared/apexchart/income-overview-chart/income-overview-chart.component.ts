@@ -1,5 +1,5 @@
 // angular import
-import { Component, OnInit, viewChild } from '@angular/core';
+import { Component, OnInit, viewChild, Input, OnChanges, SimpleChanges } from '@angular/core';
 
 // project import
 
@@ -13,13 +13,26 @@ import { CardComponent } from 'src/app/theme/shared/components/card/card.compone
   templateUrl: './income-overview-chart.component.html',
   styleUrl: './income-overview-chart.component.scss'
 })
-export class IncomeOverviewChartComponent implements OnInit {
+export class IncomeOverviewChartComponent implements OnInit, OnChanges {
   // public props
+  @Input() chartData: number[] = [80, 95, 70, 42, 65, 55, 78];
+  @Input() chartCategories: string[] = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  @Input() seriesName: string = 'Revenue';
+
   chart = viewChild.required<ChartComponent>('chart');
   chartOptions!: Partial<ApexOptions>;
 
-  // life cycle hook
   ngOnInit() {
+    this.updateOptions();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ((changes['chartData'] || changes['chartCategories']) && this.chartOptions) {
+      this.updateOptions();
+    }
+  }
+
+  private updateOptions(): void {
     this.chartOptions = {
       chart: {
         type: 'bar',
@@ -31,8 +44,9 @@ export class IncomeOverviewChartComponent implements OnInit {
       },
       plotOptions: {
         bar: {
-          columnWidth: '45%',
-          borderRadius: 4
+          columnWidth: '40%',
+          borderRadius: 6,
+          distributed: true
         }
       },
       dataLabels: {
@@ -40,15 +54,17 @@ export class IncomeOverviewChartComponent implements OnInit {
       },
       series: [
         {
-          data: [80, 95, 70, 42, 65, 55, 78]
+          name: this.seriesName,
+          data: this.chartData
         }
       ],
       stroke: {
-        curve: 'smooth',
-        width: 2
+        show: true,
+        width: 2,
+        colors: ['transparent']
       },
       xaxis: {
-        categories: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+        categories: this.chartCategories,
         axisBorder: {
           show: false
         },
@@ -57,16 +73,25 @@ export class IncomeOverviewChartComponent implements OnInit {
         },
         labels: {
           style: {
-            colors: ['#8c8c8c', '#8c8c8c', '#8c8c8c', '#8c8c8c', '#8c8c8c', '#8c8c8c', '#8c8c8c']
+            colors: this.chartCategories.map(() => '#94a3b8'),
+            fontSize: '11px'
           }
         }
       },
       yaxis: {
-        show: false
+        show: true,
+        labels: {
+          style: {
+            colors: ['#94a3b8'],
+            fontSize: '11px'
+          }
+        }
       },
-      colors: ['#5cdbd3'],
+      colors: ['#0ea5e9', '#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#ec4899'],
       grid: {
-        show: false
+        show: true,
+        borderColor: '#f1f5f9',
+        strokeDashArray: 4
       },
       tooltip: {
         theme: 'light'

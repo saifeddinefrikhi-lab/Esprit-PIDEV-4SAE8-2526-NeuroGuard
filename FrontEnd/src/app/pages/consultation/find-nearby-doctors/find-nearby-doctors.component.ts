@@ -1,10 +1,12 @@
 import { Component, OnInit, ViewChild, ElementRef, inject, ChangeDetectorRef } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DistanceService } from '../../../services/distance.service';
 import { User } from '../../../core/models/user.model';
 import { Consultation } from '../../../core/models/consultation.model';
 import { HttpClient } from '@angular/common/http';
+import { ReservationService } from '../../../services/reservation.service';
 
 // Déclaration Google Maps API
 declare let google: any;
@@ -76,21 +78,18 @@ export class FindNearbyDoctorsComponent implements OnInit {
   private distanceService = inject(DistanceService);
   private http = inject(HttpClient);
   private cdr = inject(ChangeDetectorRef);
+  private reservationService = inject(ReservationService);
+  private router = inject(Router);
 
   ngOnInit(): void {
     this.initializeMap();
     this.getCurrentLocation();
   }
 
-  /**
-   * Initialise la carte Google Maps.
-   */
   private initializeMap(): void {
-    // La vraie initialisation se fera quand le composant est rendu
-    // Google Maps API doit être chargée dans index.html avec votre clé API
     setTimeout(() => {
       if (this.mapElement && typeof google !== 'undefined') {
-        const defaultLocation = { lat: 48.8566, lng: 2.3522 };  // Paris
+        const defaultLocation = { lat: 48.8566, lng: 2.3522 }; 
         this.map = new google.maps.Map(this.mapElement.nativeElement, {
           zoom: 12,
           center: defaultLocation,
@@ -105,9 +104,6 @@ export class FindNearbyDoctorsComponent implements OnInit {
     }, 500);
   }
 
-  /**
-   * Récupère la position GPS actuelle du patient.
-   */
   public getCurrentLocation(): void {
     this.isLoadingLocation = true;
     this.patientLocationError = '';
@@ -123,21 +119,16 @@ export class FindNearbyDoctorsComponent implements OnInit {
           };
 
           this.isLoadingLocation = false;
-          this.successMessage = 'Position obtenue avec succès. Cliquez sur "Rechercher" pour trouver les médecins.';
+          this.successMessage = 'Location obtained successfully. Click "Search" to find nearby doctors.';
 
-          // Placer le marker du patient sur la carte
           if (this.map) {
             this.updateMapWithPatientLocation();
           }
-
-          // NE PAS appeler searchClosestProviders automatiquement
-          // L'utilisateur doit cliquer sur "Rechercher"
         },
         (error) => {
           this.isLoadingLocation = false;
           this.patientLocationError = this.getGeolocationErrorMessage(error.code);
           
-          // Fallback: utiliser localisation de the localStorage si existe, sinon Paris par défaut
           const storedLat = localStorage.getItem('patientLat');
           const storedLon = localStorage.getItem('patientLon');
           
@@ -146,8 +137,8 @@ export class FindNearbyDoctorsComponent implements OnInit {
                 latitude: parseFloat(storedLat),
                 longitude: parseFloat(storedLon)
              };
-             this.patientLocationError = 'Position obtenue depuis vos paramètres.';
-             this.successMessage = 'Position connue. Cliquez sur "Rechercher".';
+             this.patientLocationError = 'Loaded location from settings.';
+             this.successMessage = 'Location known. Click "Search".';
           } else {
              this.patientLocation = {
                latitude: 48.8566,
@@ -155,7 +146,6 @@ export class FindNearbyDoctorsComponent implements OnInit {
              };
           }
           this.updateMapWithPatientLocation();
-          console.warn('Geolocation error, using fallback location:', error);
         },
         {
           enableHighAccuracy: true,
@@ -165,17 +155,13 @@ export class FindNearbyDoctorsComponent implements OnInit {
       );
     } else {
       this.isLoadingLocation = false;
-      this.patientLocationError = 'Géolocalisation non supportée par votre navigateur';
+      this.patientLocationError = 'Geolocation is not supported by your browser';
     }
   }
 
-  /**
-   * Met à jour la carte avec la position du patient.
-   */
   private updateMapWithPatientLocation(): void {
     if (!this.map || !this.patientLocation) return;
 
-    // Ajouter/update marker du patient
     if (this.userMarker) {
       this.userMarker.setPosition({
         lat: this.patientLocation.latitude,
@@ -188,39 +174,30 @@ export class FindNearbyDoctorsComponent implements OnInit {
           lng: this.patientLocation.longitude
         },
         map: this.map,
-        title: 'Votre position',
+        title: 'Your Location',
         icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
       });
     }
 
-    // Centrer la carte
     this.map.setCenter({
       lat: this.patientLocation.latitude,
       lng: this.patientLocation.longitude
     });
   }
 
-  /**
-   * Recherche les médecins les plus proches avec debouncing.
-   * Évite les appels API trop rapides en succession.
-   */
   public searchClosestProviders(): void {
-    // Debounce: vérifier si suffisamment de temps s'est écoulé
     const now = Date.now();
     if (now - this.lastSearchTime < 1000) {
-      console.log('[Debounce] Search called too soon, skipping API call');
       return;
     }
 
     if (!this.patientLocation) {
-      this.errorMessage = 'Position du patient non disponible';
+      this.errorMessage = 'Patient location not available';
       return;
     }
 
-    // Mettre à jour le timestamp du dernier appel
     this.lastSearchTime = now;
 
-    // Arrêter tout timer de debounce précédent
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
@@ -229,7 +206,6 @@ export class FindNearbyDoctorsComponent implements OnInit {
     this.errorMessage = '';
     this.successMessage = '';
 
-    // Appel direct au backend qui gère les providers sans avoir besoin de passer de liste
     this.distanceService.getNearestProviders(
       this.patientLocation.latitude,
       this.patientLocation.longitude,
@@ -244,33 +220,27 @@ export class FindNearbyDoctorsComponent implements OnInit {
         this.resultCount = response.resultCount || 0;
 
         if (this.closestProviders.length > 0) {
-          this.successMessage = `${this.resultCount} médecin(s) trouvé(s) à proximité`;
+          this.successMessage = `Found ${this.resultCount} specialist(s) nearby.`;
           this.updateMapWithProviders();
         } else {
-          this.errorMessage = `Aucun médecin trouvé dans un rayon de ${this.searchRadius} km`;
+          this.errorMessage = `No specialists found within ${this.searchRadius} km.`;
         }
         this.cdr.markForCheck();
       },
       (error) => {
         this.isSearching = false;
-        this.errorMessage = 'Erreur lors de la recherche: ' + (error.error?.message || error.message);
+        this.errorMessage = 'Error during search: ' + (error.error?.message || error.message);
         this.cdr.markForCheck();
-        console.error('Search error:', error);
       }
     );
   }
 
-  /**
-   * Met à jour la carte avec les marqueurs des médecins.
-   */
   private updateMapWithProviders(): void {
     if (!this.map) return;
 
-    // Nettoyer les anciens marqueurs
     this.markers.forEach(marker => marker.setMap(null));
     this.markers = [];
 
-    // Ajouter nouveaux marqueurs pour chaque médecin
     this.closestProviders.forEach((provider, index) => {
       const marker = new google.maps.Marker({
         position: {
@@ -278,11 +248,10 @@ export class FindNearbyDoctorsComponent implements OnInit {
           lng: provider.location.longitude
         },
         map: this.map,
-        title: provider.providerName || `Médecin ${index + 1}`,
+        title: provider.providerName || `Doctor ${index + 1}`,
         label: (index + 1).toString()
       });
 
-      // Ajouter info window avec détails
       const infoContent = this.getProviderInfoWindowContent(provider);
       const infoWindow = new google.maps.InfoWindow({
         content: infoContent
@@ -296,7 +265,6 @@ export class FindNearbyDoctorsComponent implements OnInit {
       this.markers.push(marker);
     });
 
-    // Ajuster les limites de la carte pour afficher tous les marqueurs
     if (this.markers.length > 0) {
       const bounds = new google.maps.LatLngBounds();
       if (this.userMarker) {
@@ -307,35 +275,22 @@ export class FindNearbyDoctorsComponent implements OnInit {
     }
   }
 
-  /**
-   * Génère le contenu de l'info window pour un médecin.
-   */
   private getProviderInfoWindowContent(provider: any): string {
     const duration = provider.estimatedDurationHuman || 'N/A';
     const distance = provider.roadDistanceKm || provider.distanceKm;
 
     return `<div style="max-width: 300px;">
-      <h4>${provider.providerName || 'Médecin'}</h4>
-      <p><strong>Spécialité:</strong> ${provider.specialty || 'Généraliste'}</p>
+      <h4>${provider.providerName || 'Doctor'}</h4>
+      <p><strong>Specialty:</strong> ${provider.specialty || 'General Practitioner'}</p>
       <p><strong>Distance:</strong> ${distance} km</p>
-      <p><strong>Durée:</strong> ${duration}</p>
-      <p><strong>Notation:</strong> ${provider.rating ? provider.rating + '/5' : 'N/A'}</p>
-      <button class="btn btn-sm btn-primary" onclick="alert('Réservation: disponible dans l\\'interface complète')">
-        Réserver
-      </button>
+      <p><strong>Time:</strong> ${duration}</p>
     </div>`;
   }
 
-  /**
-   * Sélectionne un médecin.
-   */
   public selectProvider(provider: any): void {
     this.selectedProvider = provider;
   }
 
-  /**
-   * Affiche les directions vers un médecin sur Google Maps.
-   */
   public showDirections(provider: any): void {
     if (!this.patientLocation) return;
 
@@ -353,33 +308,33 @@ export class FindNearbyDoctorsComponent implements OnInit {
     window.open(url, '_blank');
   }
 
-  /**
-   * Change le mode de transport et relance la recherche.
-   */
   public onTransportModeChange(): void {
     this.searchClosestProviders();
   }
 
-  /**
-   * Change le rayon de recherche et relance la recherche.
-   */
   public onRadiusChange(): void {
     this.searchClosestProviders();
   }
 
-  /**
-   * Obtient le message d'erreur de géolocalisation approprié.
-   */
   private getGeolocationErrorMessage(code: number): string {
     switch (code) {
       case 1:
-        return 'Permission de géolocalisation refusée';
+        return 'Geolocation permission denied';
       case 2:
-        return 'Position non disponible';
+        return 'Location unavailable';
       case 3:
-        return 'Délai d\'attente dépassé';
+        return 'Timeout exceeded';
       default:
-        return 'Erreur de géolocalisation';
+        return 'Geolocation error';
     }
+  }
+
+  // --- Booking functions ---
+  public openBookingModal(provider: any): void {
+    console.log('Redirecting to booking for provider:', provider.providerId);
+    // Redirect to patient reservations page with the providerId in query params
+    this.router.navigate(['/patient/reservations'], { 
+      queryParams: { providerId: provider.providerId } 
+    });
   }
 }

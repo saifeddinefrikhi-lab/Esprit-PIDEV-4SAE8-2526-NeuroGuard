@@ -23,6 +23,8 @@ export interface Consultation {
   meetingLink?: string;
   providerId: number;
   patientId: number;
+  patientName?: string;
+  providerName?: string;
   caregiverId?: number;
   createdAt: string;
 }

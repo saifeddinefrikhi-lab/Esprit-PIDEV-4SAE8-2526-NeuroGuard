@@ -76,6 +76,10 @@ spring:
           uri: lb://assurance-service
           predicates:
             - Path=/api/assurances/**
+        - id: reservation-service
+          uri: lb://reservation-service
+          predicates:
+            - Path=/api/reservations/**
 
 logging:
   level:

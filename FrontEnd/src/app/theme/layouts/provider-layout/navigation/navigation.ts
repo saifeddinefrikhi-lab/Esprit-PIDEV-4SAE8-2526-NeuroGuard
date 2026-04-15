@@ -97,7 +97,7 @@ export const NavigationItems: NavigationItem[] = [
         title: 'View Appointments',
         type: 'item',
         classes: 'nav-item',
-        url: '/provider/appointments', // Path to view appointments
+        url: '/provider/reservations', // Path to view appointments
         icon: 'calendar', // Ant Design calendar icon
       },
     ]
@@ -125,7 +125,7 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'schedule', // Ant Design schedule icon
       },
       {
-        id: 'consultation-history', 
+        id: 'consultation-history',
         title: 'Consultation History',
         type: 'item',
         url: '/provider/consultations/history', // Path to view consultation history
@@ -182,7 +182,7 @@ export const NavigationItems: NavigationItem[] = [
       },
     ]
   },
-  
-  
+
+
 ];
 

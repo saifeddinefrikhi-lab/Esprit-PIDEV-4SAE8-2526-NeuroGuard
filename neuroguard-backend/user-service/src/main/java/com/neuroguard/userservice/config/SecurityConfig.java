@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()   // login & register are public
+                        .requestMatchers("OPTIONS", "/**").permitAll()  // Allow CORS preflight requests
                         .anyRequest().authenticated()              // all other endpoints need JWT
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

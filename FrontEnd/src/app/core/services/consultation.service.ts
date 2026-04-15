@@ -65,4 +65,16 @@ getCaregivers(): Observable<UserDto[]> {
 getProviders(): Observable<UserDto[]> {
   return this.http.get<UserDto[]>(`${environment.apiUrl}/users/role/PROVIDER`);
 }
+
+getAdminStatistics(): Observable<any> {
+  return this.http.get<any>(`${this.baseUrl}/statistics/admin`);
+}
+
+  getProviderStatistics(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/statistics/provider`);
+  }
+
+  getReservationStatistics(): Observable<any> {
+    return this.http.get<any>(`${environment.apiUrl}/api/reservations/statistics/admin`);
+  }
 }

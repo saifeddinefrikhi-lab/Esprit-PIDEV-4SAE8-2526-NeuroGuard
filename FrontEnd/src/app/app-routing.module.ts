@@ -74,6 +74,10 @@ export const routes: Routes = [
         path: 'patient/find-nearby-doctors',
         loadComponent: () => import('./pages/consultation/find-nearby-doctors/find-nearby-doctors.component').then((c) => c.FindNearbyDoctorsComponent)
       },
+      {
+        path: 'patient/reservations',
+        loadComponent: () => import('./Front-office/patient/patient-reservations/patient-reservations.component').then((c) => c.PatientReservationsComponent)
+      },
     ]
   },
 
@@ -144,6 +148,10 @@ export const routes: Routes = [
       {
         path: 'provider/find-nearby-doctors',
         loadComponent: () => import('./pages/consultation/find-nearby-doctors/find-nearby-doctors.component').then((c) => c.FindNearbyDoctorsComponent)
+      },
+      {
+        path: 'provider/reservations',
+        loadComponent: () => import('./Front-office/healthcare-provider/provider-reservations/provider-reservations.component').then((c) => c.ProviderReservationsComponent)
       }
     ]
   },

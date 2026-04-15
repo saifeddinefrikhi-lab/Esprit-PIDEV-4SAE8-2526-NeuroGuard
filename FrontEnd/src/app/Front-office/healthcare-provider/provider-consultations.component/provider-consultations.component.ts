@@ -10,6 +10,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { Consultation, ConsultationType } from '../../../core/models/consultation.model';
 import { Router, RouterModule } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-provider-consultations',
@@ -36,6 +37,8 @@ export class ProviderConsultationsComponent implements OnInit {
   caregiversLoading = false;
   patientLoadError = '';
   caregiverLoadError = '';
+  private apiUrl = `${environment.apiUrl}/api/assurances`; // Using Gateway
+  private userUrl = `${environment.apiUrl}/users`; // To fetch patient/provider names if needed
 
   constructor(
     private consultationService: ConsultationService,
@@ -106,14 +109,18 @@ export class ProviderConsultationsComponent implements OnInit {
     this.cdr.detectChanges();
     this.consultationService.getPatients().subscribe({
       next: (data) => {
-        this.patients = data ?? [];
-        this.patientsLoading = false;
-        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.patients = data ?? [];
+          this.patientsLoading = false;
+          this.cdr.detectChanges();
+        });
       },
       error: (err) => {
-        this.patientsLoading = false;
-        this.patientLoadError = err?.message || 'Impossible de charger la liste des patients.';
-        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.patientsLoading = false;
+          this.patientLoadError = err?.message || 'Impossible de charger la liste des patients.';
+          this.cdr.detectChanges();
+        });
       }
     });
   }
@@ -123,21 +130,26 @@ export class ProviderConsultationsComponent implements OnInit {
     this.cdr.detectChanges();
     this.consultationService.getCaregivers().subscribe({
       next: (data) => {
-        this.caregivers = data ?? [];
-        this.caregiversLoading = false;
-        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.caregivers = data ?? [];
+          this.caregiversLoading = false;
+          this.cdr.detectChanges();
+        });
       },
       error: (err) => {
-        this.caregiversLoading = false;
-        this.caregiverLoadError = err?.message || 'Impossible de charger la liste des soignants.';
-        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.caregiversLoading = false;
+          this.caregiverLoadError = err?.message || 'Impossible de charger la liste des soignants.';
+          this.cdr.detectChanges();
+        });
       }
     });
   }
 
-  getPatientName(id: number): string {
-    const p = this.patients.find(x => x.id === id);
-    return p ? `${p.firstName} ${p.lastName}` : id.toString();
+  getPatientName(consultation: Consultation): string {
+    if (consultation.patientName) return consultation.patientName;
+    const p = this.patients.find(x => x.id === consultation.patientId);
+    return p ? `${p.firstName} ${p.lastName}` : (consultation.patientId?.toString() || '-');
   }
 
   getCaregiverName(id: number): string {
@@ -265,10 +277,14 @@ export class ProviderConsultationsComponent implements OnInit {
   joinOnlineConsultation(consultation: Consultation): void {
     this.consultationService.getJoinLink(consultation.id).subscribe({
       next: (link) => {
-        this.meetingTitle = consultation.title;
-        this.meetingLink = link;
-        this.meetingUrl = this.sanitizer.bypassSecurityTrustResourceUrl(link + '#config.prejoinPageEnabled=false');
-        this.showMeetingModal = true;
+        // Use setTimeout to avoid NG0100 error when opening modal from list
+        setTimeout(() => {
+          this.meetingTitle = consultation.title;
+          this.meetingLink = link;
+          this.meetingUrl = this.sanitizer.bypassSecurityTrustResourceUrl(link + '#config.prejoinPageEnabled=false');
+          this.showMeetingModal = true;
+          this.cdr.detectChanges();
+        });
       },
       error: (err) => alert('Impossible de rejoindre : ' + (err?.message || err))
     });

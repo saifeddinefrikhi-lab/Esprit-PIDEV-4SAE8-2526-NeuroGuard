@@ -8,11 +8,14 @@ import { IncomeOverviewChartComponent } from 'src/app/theme/shared/apexchart/inc
 import { AnalyticsChartComponent } from 'src/app/theme/shared/apexchart/analytics-chart/analytics-chart.component';
 import { SalesReportChartComponent } from 'src/app/theme/shared/apexchart/sales-report-chart/sales-report-chart.component';
 
-// Icons
+import { NgApexchartsModule, ApexOptions } from 'ng-apexcharts';
 import { IconService, IconDirective } from '@ant-design/icons-angular';
-import { FallOutline, GiftOutline, MessageOutline, RiseOutline, SettingOutline} from '@ant-design/icons-angular/icons';
-import { CardComponent } from 'src/app/theme/shared/components/card/card.component';
 import {
+  RiseOutline,
+  FallOutline,
+  SettingOutline,
+  GiftOutline,
+  MessageOutline,
   DashboardOutline,
   HomeOutline,
   UserOutline,
@@ -31,15 +34,13 @@ import { ConsultationService } from 'src/app/core/services/consultation.service'
 
 @Component({ 
   selector: 'app-default',
+  standalone: true,
   imports: [
     CommonModule,
     RouterModule,
-    CardComponent,
     IconDirective,
-    MonthlyBarChartComponent,
-    IncomeOverviewChartComponent,
-    AnalyticsChartComponent,
-    SalesReportChartComponent
+    NgApexchartsModule,
+    MonthlyBarChartComponent
   ],
   templateUrl: './default.component.html',
   styleUrls: ['./default.component.scss']
@@ -51,33 +52,33 @@ export class DefaultComponent implements OnInit {
   statsLoading = true;
   statsError = '';
 
+  AnalyticEcommerce: any[] = [];
+  topPatients: any[] = [];
+  topResPatients: any[] = [];
+  recentActivities: any[] = [];
+  
+  chartData: number[] = [0, 0, 0, 0];
+  chartLabels: string[] = ['En ligne', 'Présentiel', 'Complété', 'Prévu'];
+  
+  typeChartOptions!: Partial<ApexOptions>;
+  statusChartOptions!: Partial<ApexOptions>;
+  resChartOptions!: Partial<ApexOptions>;
+  
+  monthlyData: number[] = [];
+  monthlyLabels: string[] = [];
+  statusData: number[] = [];
+  statusLabels: string[] = [];
+
+  resStats: any = { pending: 0, accepted: 0, rejected: 0, total: 0 };
+
   constructor() {
-    this.iconService.addIcon(...[RiseOutline, FallOutline, SettingOutline, GiftOutline, MessageOutline,HomeOutline,
-      DashboardOutline,
-      HomeOutline,
-      UserOutline,
-      UserAddOutline,
-      TeamOutline,
-      IdcardOutline,
-      LockOutline,
-      ScheduleOutline,
-      CalendarOutline,
-      MedicineBoxOutline,
-      FilePdfOutline,
-      FileTextOutline,
-      BookOutline
+    this.iconService.addIcon(...[
+      RiseOutline, FallOutline, SettingOutline, GiftOutline, MessageOutline, HomeOutline,
+      DashboardOutline, HomeOutline, UserOutline, UserAddOutline, TeamOutline,
+      IdcardOutline, LockOutline, ScheduleOutline, CalendarOutline, MedicineBoxOutline,
+      FilePdfOutline, FileTextOutline, BookOutline
     ]);
   }
-
-  // Fake Data for Alzheimer's Application Analytics and Transactions
-
-  recentOrder = [
-    { id: 'ORD1234', name: 'Alzheimer’s Medication 1', status: 'Delivered', status_type: 'success', quantity: 3, amount: '$450' },
-    { id: 'ORD5678', name: 'Alzheimer’s Medication 2', status: 'Pending', status_type: 'warning', quantity: 2, amount: '$320' },
-    { id: 'ORD91011', name: 'Monitoring Device', status: 'Shipped', status_type: 'info', quantity: 1, amount: '$100' },
-  ];
-
-  AnalyticEcommerce: Array<{ title: string; amount: string; background: string; border: string; icon: string; percentage?: string; color?: string; number?: string }> = [];
 
   ngOnInit(): void {
     this.loadStats();
@@ -86,65 +87,117 @@ export class DefaultComponent implements OnInit {
   loadStats(): void {
     this.statsLoading = true;
     this.statsError = '';
+    
     forkJoin({
       patients: this.consultationService.getPatients(),
       providers: this.consultationService.getProviders(),
       caregivers: this.consultationService.getCaregivers(),
-      consultations: this.consultationService.getAllConsultations()
+      consultations: this.consultationService.getAllConsultations(),
+      advStats: this.consultationService.getAdminStatistics(),
+      resStats: this.consultationService.getReservationStatistics()
     }).subscribe({
-      next: ({ patients, providers, caregivers, consultations }) => {
+      next: ({ patients, providers, caregivers, consultations, advStats, resStats }) => {
         const patientsCount = patients?.length ?? 0;
         const providersCount = providers?.length ?? 0;
         const caregiversCount = caregivers?.length ?? 0;
         const consultationsCount = consultations?.length ?? 0;
-        const onlineCount = consultations?.filter(c => c.type === 'ONLINE').length ?? 0;
-        const completedCount = consultations?.filter(c => c.status === 'COMPLETED').length ?? 0;
+        
+        const byType = advStats?.byType || {};
+        const onlineCount = byType['ONLINE'] || 0;
+        const byStatus = advStats?.byStatus || {};
+        const completedCount = byStatus['COMPLETED'] || 0;
+
+        this.topPatients = advStats?.topPatients || [];
+        this.topResPatients = resStats?.topPatients || [];
+        
+        this.resStats = {
+          pending: resStats?.byStatus?.['PENDING'] || 0,
+          accepted: resStats?.byStatus?.['ACCEPTED'] || 0,
+          rejected: resStats?.byStatus?.['REJECTED'] || 0,
+          total: resStats?.total || 0
+        };
+
+        // Map real consultations to recent activities
+        this.recentActivities = (consultations ?? []).slice(0, 8).map(c => ({
+          title: c.title,
+          time: new Date(c.startTime).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+          type: c.type,
+          status: c.status,
+          patientId: c.patientId
+        }));
 
         this.AnalyticEcommerce = [
-          { title: 'Patients', amount: String(patientsCount), background: 'bg-light-primary ', border: 'border-primary', icon: 'rise' },
-          { title: 'Providers', amount: String(providersCount), background: 'bg-light-success ', border: 'border-success', icon: 'rise' },
-          { title: 'Caregivers', amount: String(caregiversCount), background: 'bg-light-warning ', border: 'border-warning', icon: 'rise' },
-          { title: 'Consultations', amount: String(consultationsCount), background: 'bg-light-info ', border: 'border-info', icon: 'rise', number: `${onlineCount} en ligne, ${completedCount} terminées` }
+          { title: 'Base Patients', amount: String(patientsCount), background: 'bg-light-primary ', icon: 'user' },
+          { title: 'Total Consultations', amount: String(consultationsCount), background: 'bg-light-success ', icon: 'schedule' },
+          { title: 'Réservations Archivées', amount: String(this.resStats.total), background: 'bg-light-warning ', icon: 'calendar' },
+          { title: 'Consultations en Cours', amount: String(byStatus['ONGOING'] || 0), background: 'bg-light-info ', icon: 'medicine-box' }
         ];
+
+        this.updateChartData(byType, byStatus, advStats?.monthlyDistribution);
+        this.initExtraCharts(byType, byStatus, resStats?.byStatus);
         this.statsLoading = false;
       },
       error: (err) => {
         this.statsError = err?.error?.message || err?.message || 'Impossible de charger les statistiques.';
         this.statsLoading = false;
-        this.AnalyticEcommerce = [
-          { title: 'Patients', amount: '-', background: 'bg-light-primary ', border: 'border-primary', icon: 'fall' },
-          { title: 'Providers', amount: '-', background: 'bg-light-success ', border: 'border-success', icon: 'fall' },
-          { title: 'Caregivers', amount: '-', background: 'bg-light-warning ', border: 'border-warning', icon: 'fall' },
-          { title: 'Consultations', amount: '-', background: 'bg-light-info ', border: 'border-info', icon: 'fall' }
-        ];
       }
     });
   }
 
-  transaction = [
-    {
-      background: 'text-success bg-light-success',
-      icon: 'gift',
-      title: 'Patient #112233 Medication Order',
-      time: 'Today, 2:00 AM',
-      amount: '+ $150',
-      percentage: '78%'
-    },
-    {
-      background: 'text-primary bg-light-primary',
-      icon: 'message',
-      title: 'Patient #445566 Medication Order',
-      time: '5 August, 1:45 PM',
-      amount: '- $180',
-      percentage: '8%'
-    },
-    {
-      background: 'text-danger bg-light-danger',
-      icon: 'setting',
-      title: 'Patient #778899 Monitoring Device',
-      time: '7 hours ago',
-      amount: '- $320',
-      percentage: '16%'
+  updateChartData(byType: any, byStatus: any, monthlyDist: any): void {
+    this.chartData = [
+      byType['ONLINE'] || 0,
+      byType['PRESENTIAL'] || 0,
+      byStatus['COMPLETED'] || 0,
+      byStatus['SCHEDULED'] || 0
+    ];
+
+    if (monthlyDist) {
+      this.monthlyLabels = Object.keys(monthlyDist);
+      this.monthlyData = Object.values(monthlyDist);
     }
-  ];
+
+    if (byStatus) {
+      this.statusLabels = Object.keys(byStatus);
+      this.statusData = Object.values(byStatus);
+    }
+  }
+
+  private initExtraCharts(byType: any, byStatus: any, resByStatus: any): void {
+    const typeValues = [byType['ONLINE'] || 0, byType['PRESENTIAL'] || 0];
+    this.typeChartOptions = {
+      series: typeValues,
+      chart: { type: 'donut', height: 220, animations: { enabled: true, speed: 800 } },
+      labels: ['En ligne', 'Présentiel'],
+      colors: ['#4f46e5', '#10b981'],
+      legend: { position: 'bottom' },
+      dataLabels: { enabled: false },
+      plotOptions: { pie: { donut: { size: '75%', labels: { show: true, total: { show: true, label: 'Type' } } } } }
+    };
+
+    const statusValues = Object.values(byStatus);
+    const statusKeys = Object.keys(byStatus);
+    this.statusChartOptions = {
+      series: statusValues as number[],
+      chart: { type: 'pie', height: 220 },
+      labels: statusKeys,
+      colors: ['#6366f1', '#0ea5e9', '#f59e0b', '#f43f5e'],
+      legend: { position: 'bottom' },
+      dataLabels: { enabled: true }
+    };
+
+    // New Reservation Chart
+    if (resByStatus) {
+      const resKeys = ['ACCEPTED', 'PENDING', 'REJECTED'];
+      const resValues = resKeys.map(k => resByStatus[k] || 0);
+      this.resChartOptions = {
+        series: resValues,
+        chart: { type: 'donut', height: 220 },
+        labels: ['Acceptées', 'En attente', 'Rejetées'],
+        colors: ['#10b981', '#f59e0b', '#ef4444'],
+        legend: { position: 'bottom' },
+        plotOptions: { pie: { donut: { size: '70%', labels: { show: true, total: { show: true, label: 'Réservations' } } } } }
+      };
+    }
+  }
 }

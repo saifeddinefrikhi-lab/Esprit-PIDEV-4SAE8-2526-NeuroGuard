@@ -1,137 +1,199 @@
-<div class="row mb-3">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="mb-3">Accès rapide</h5>
-        <div class="d-flex flex-wrap gap-2">
-          <a routerLink="/admin/providers" class="btn btn-primary">Gestion des providers</a>
-          <a routerLink="/admin/caregivers" class="btn btn-primary">Gestion des caregivers</a>
-          <a routerLink="/admin/patients" class="btn btn-primary">Gestion des patients</a>
-          <a routerLink="/admin/consultations" class="btn btn-info">Consultations</a>
+<div class="mission-header mb-4 d-flex justify-content-between align-items-center p-4 hyper-glass">
+  <div>
+    <h3 class="mb-1 f-w-700 glow-text text-primary">NeuroGuard Mission Control</h3>
+    <p class="text-muted small mb-0"><span class="pulse-dot me-2"></span>Système en ligne | Flux de données en temps réel</p>
+  </div>
+  <div class="d-none d-md-block">
+    <div class="d-flex gap-2">
+      <a routerLink="/admin/providers" class="btn btn-sm btn-light-primary rounded-pill px-3">Médecins</a>
+      <a routerLink="/admin/patients" class="btn btn-sm btn-light-info rounded-pill px-3">Patients</a>
+      <a routerLink="/admin/caregivers" class="btn btn-sm btn-light-warning rounded-pill px-3">Soignants</a>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-2" *ngIf="statsLoading">
+  <div class="col-12"><div class="alert hyper-glass border-primary text-primary">Initialisation du flux de données...</div></div>
+</div>
+<div class="row mb-2" *ngIf="statsError">
+  <div class="col-12"><div class="alert hyper-glass border-danger text-danger">{{ statsError }}</div></div>
+</div>
+
+<div class="row g-4 mb-4" *ngIf="!statsLoading">
+  @for (stat of AnalyticEcommerce; track stat) {
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="mission-card hyper-glass p-4 h-100">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="stat-icon-box" [ngClass]="stat.background">
+            <i antIcon [type]="stat.icon" theme="outline" class="fs-4"></i>
+          </div>
+          <div class="badge bg-light-success text-success rounded-pill">+12%</div>
+        </div>
+        <h6 class="text-muted f-w-500 mb-1">{{ stat.title }}</h6>
+        <h3 class="mb-0 f-w-700 tracking-tight">{{ stat.amount }}</h3>
+      </div>
+    </div>
+  }
+</div>
+
+<div class="row g-4 mb-4" *ngIf="!statsLoading">
+  <div class="col-12 col-lg-8">
+    <div class="mission-card hyper-glass p-4 h-100">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0 f-w-700">Vélocité des Consultations</h5>
+        <span class="badge bg-light-primary text-primary">Tendance Mensuelle</span>
+      </div>
+      <app-monthly-bar-chart [chartData]="monthlyData" [chartCategories]="monthlyLabels" seriesName="Consultations" />
+    </div>
+  </div>
+  
+  <div class="col-12 col-lg-4">
+    <div class="mission-card hyper-glass p-4 h-100">
+      <h5 class="mb-4 f-w-700">Analytique des Réservations</h5>
+      @if (resChartOptions) {
+        <div class="chart-container py-2 d-flex justify-content-center">
+            <apx-chart
+              [series]="resChartOptions.series!"
+              [chart]="resChartOptions.chart!"
+              [labels]="resChartOptions.labels!"
+              [colors]="resChartOptions.colors!"
+              [plotOptions]="resChartOptions.plotOptions!"
+              [legend]="resChartOptions.legend!"
+            />
+        </div>
+      }
+      <div class="mt-3">
+        <div class="d-flex justify-content-between mb-2">
+          <span class="small text-muted">Acceptées</span>
+          <span class="small f-w-700 text-success">{{ resStats.accepted }}</span>
+        </div>
+        <div class="progress mb-3" style="height: 6px; background: rgba(0,0,0,0.05);">
+          <div class="progress-bar bg-success" [style.width.%]="(resStats.accepted / (resStats.total || 1)) * 100"></div>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="small text-muted">En attente</span>
+          <span class="small f-w-700 text-warning">{{ resStats.pending }}</span>
+        </div>
+        <div class="progress" style="height: 6px; background: rgba(0,0,0,0.05);">
+          <div class="progress-bar bg-warning" [style.width.%]="(resStats.pending / (resStats.total || 1)) * 100"></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="row">
-  <!-- Stats Section -->
-  <div class="col-12 mb-2" *ngIf="statsLoading">
-    <div class="alert alert-info">Chargement des statistiques...</div>
-  </div>
-  <div class="col-12 mb-2" *ngIf="statsError">
-    <div class="alert alert-danger">{{ statsError }}</div>
-  </div>
-  <div class="col-md-6 col-xl-3" *ngFor="let analytic of AnalyticEcommerce">
-    <app-card [showHeader]="false" blockClass="dashboard-card">
-      <h6 class="mb-2 f-w-400 text-muted">{{ analytic.title }}</h6>
-      <h4 class="mb-3">
-        {{ analytic.amount }}
-        <span class="badge {{ analytic.background }} border {{ analytic.border }} ">
-          <i antIcon type="{{ analytic.icon }}" theme="outline"></i>
-        </span>
-      </h4>
-      <p class="mb-0 text-muted text-sm" *ngIf="analytic.number">{{ analytic.number }}</p>
-    </app-card>
-  </div>
-
-  <!-- Monthly Bar Chart -->
-  <div class="col-md-12 col-xl-8">
-    <app-monthly-bar-chart />
-  </div>
-
-  <!-- Income Overview Chart -->
-  <div class="col-md-12 col-xl-4">
-    <app-income-overview-chart />
-  </div>
-
-  <!-- Recent Patient Orders Section -->
-  <div class="col-md-12 col-xl-8">
-    <h5 class="mb-3">Recent Patient Orders</h5>
-    <div class="card tbl-card">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead>
-            <tr>
-              <th>ORDER ID</th>
-              <th>PRODUCT NAME</th>
-              <th>STATUS</th>
-              <th class="text-end">TOTAL QUANTITY</th>
-              <th class="text-end">TOTAL COST</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let order of recentOrder">
-              <td><a href="javascript:" class="text-muted">{{ order.id }}</a></td>
-              <td>{{ order.name }}</td>
-              <td>
-                <span class="d-block">
-                  <i class="badge-circle {{ order.status_type }} f-10 m-r-5"></i>
-                  {{ order.status }}
-                </span>
-              </td>
-              <td class="text-end">{{ order.quantity }}</td>
-              <td class="text-end">{{ order.amount }}</td>
-            </tr>
-          </tbody>
-        </table>
+<div class="row g-4" *ngIf="!statsLoading">
+  <div class="col-12 col-xl-4">
+    <div class="mission-card hyper-glass p-4 h-100">
+      <h5 class="mb-4 f-w-700">Type & Status</h5>
+      <div class="mb-5">
+        <p class="small text-muted f-w-600 mb-3 text-uppercase tracking-wider">Répartition par Type</p>
+        @if (typeChartOptions) {
+          <div class="d-flex justify-content-center">
+            <apx-chart
+                [series]="typeChartOptions.series!"
+                [chart]="typeChartOptions.chart!"
+                [labels]="typeChartOptions.labels!"
+                [colors]="typeChartOptions.colors!"
+                [plotOptions]="typeChartOptions.plotOptions!"
+                [legend]="typeChartOptions.legend!"
+            />
+          </div>
+        }
+      </div>
+      <div>
+        <p class="small text-muted f-w-600 mb-3 text-uppercase tracking-wider">Breakdown par Status</p>
+        @if (statusChartOptions) {
+          <div class="d-flex justify-content-center">
+            <apx-chart
+                [series]="statusChartOptions.series!"
+                [chart]="statusChartOptions.chart!"
+                [labels]="statusChartOptions.labels!"
+                [colors]="statusChartOptions.colors!"
+                [legend]="statusChartOptions.legend!"
+            />
+          </div>
+        }
       </div>
     </div>
   </div>
 
-  <!-- Analytics Chart Section -->
-  <div class="col-md-12 col-xl-4">
-    <app-analytics-chart />
-  </div>
-
-  <!-- Sales Report Chart Section -->
-  <div class="col-md-12 col-xl-8">
-    <app-sales-report-chart />
-  </div>
-
-  <!-- Transaction History Section -->
-  <div class="col-md-12 col-xl-4">
-    <h5 class="mb-3">Patient Transaction History</h5>
-    <div class="card">
-      <div class="list-group list-group-flush">
-        <a href="javascript:" class="list-group-item list-group-item-action px-3" *ngFor="let history of transaction">
-          <div class="d-flex">
-            <div class="flex-shrink-0">
-              <div class="avatar avatar-s rounded-circle {{ history.background }}">
-                <i class="f-16" antIcon type="{{ history.icon }}" theme="outline"></i>
+  <div class="col-12 col-xl-4">
+    <div class="mission-card hyper-glass p-0 h-100 overflow-hidden">
+      <div class="p-4 border-bottom border-light">
+        <h5 class="mb-0 f-w-700">Flux d'Activité Réel</h5>
+      </div>
+      <div class="activity-feed p-4" style="max-height: 550px; overflow-y: auto;">
+        @for (act of recentActivities; track act) {
+          <div class="activity-item d-flex gap-3 mb-4">
+            <div class="activity-icon" [ngClass]="act.type === 'ONLINE' ? 'bg-light-info text-info' : 'bg-light-warning text-warning'">
+              <i antIcon [type]="act.type === 'ONLINE' ? 'message' : 'home'" theme="outline"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="f-w-600 small">{{ act.title }}</div>
+                <div class="smaller text-muted">{{ act.time }}</div>
+              </div>
+              <div class="d-flex align-items-center gap-2 mt-1">
+                <span class="badge rounded-pill" [ngClass]="{
+                  'bg-light-success text-success': act.status === 'COMPLETED',
+                  'bg-light-primary text-primary': act.status === 'SCHEDULED',
+                  'bg-light-danger text-danger': act.status === 'CANCELLED',
+                  'bg-light-info text-info': act.status === 'ONGOING'
+                }">{{ act.status }}</span>
+                <span class="smaller text-muted">Patient #{{ act.patientId }}</span>
               </div>
             </div>
-            <div class="flex-grow-1 ms-3">
-              <h6 class="mb-1">{{ history.title }}</h6>
-              <p class="mb-0 text-muted">{{ history.time }}</p>
-            </div>
-            <div class="flex-shrink-0 text-end">
-              <h6 class="mb-1">{{ history.amount }}</h6>
-              <p class="mb-0 text-muted">{{ history.percentage }}</p>
-            </div>
           </div>
-        </a>
+        }
+        @if (recentActivities.length === 0) {
+          <div class="text-center py-5 text-muted">Aucune activité récente.</div>
+        }
       </div>
     </div>
+  </div>
 
-    <!-- Help & Support Chat Section -->
-    <div class="card">
-      <div class="card-body">
-        <div class="row justify-content-between">
-          <div class="col-auto">
-            <h5>Help & Support Chat</h5>
-            <p class="mb-3">Typical reply within 5 min</p>
-          </div>
-          <div class="col-auto">
-            <div class="user-group mb-3">
-              <img src="assets/images/user/avatar-1.jpg" alt="image" />
-              <img src="assets/images/user/avatar-2.jpg" alt="image" />
-              <img src="assets/images/user/avatar-3.jpg" alt="image" />
-            </div>
-          </div>
+  <div class="col-12 col-xl-4">
+    <div class="mission-card hyper-glass p-4 h-100">
+      <h5 class="mb-4 f-w-700">Jointure: Patients Actifs</h5>
+      
+      <div class="mb-5">
+        <div class="d-flex align-items-center mb-3">
+          <div class="mini-icon-box bg-light-primary text-primary me-2"><i antIcon type="schedule"></i></div>
+          <p class="small f-w-700 mb-0">TOP CONSULTATIONS</p>
         </div>
-        <div class="d-grid">
-          <div class="btn btn-primary">Need Help?</div>
+        <div class="list-group list-group-flush">
+          @for (tp of topPatients; track tp) {
+            <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center px-0 border-light py-2">
+              <div class="d-flex align-items-center">
+                <div class="avatar avatar-s bg-light-primary text-primary rounded me-3 f-w-700">
+                  {{ tp.name.charAt(0) }}
+                </div>
+                <span class="small f-w-600">{{ tp.name }}</span>
+              </div>
+              <span class="badge bg-primary rounded-pill">{{ tp.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div>
+        <div class="d-flex align-items-center mb-3">
+          <div class="mini-icon-box bg-light-info text-info me-2"><i antIcon type="calendar"></i></div>
+          <p class="small f-w-700 mb-0">TOP RÉSERVATIONS</p>
+        </div>
+        <div class="list-group list-group-flush">
+          @for (rp of topResPatients; track rp) {
+            <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center px-0 border-light py-2">
+              <div class="d-flex align-items-center">
+                <div class="avatar avatar-s bg-light-info text-info rounded me-3 f-w-700">
+                  {{ rp.name.charAt(0) }}
+                </div>
+                <span class="small f-w-600">{{ rp.name }}</span>
+              </div>
+              <span class="badge bg-info rounded-pill">{{ rp.count }}</span>
+            </div>
+          }
         </div>
       </div>
     </div>

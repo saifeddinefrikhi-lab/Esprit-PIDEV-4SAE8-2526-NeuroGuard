@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,7 +47,7 @@ public class ConsultationService {
     }
 
     @Transactional
-    public ConsultationResponse createConsultation(ConsultationRequest request, Long userId, String role) {
+    public ConsultationResponse createConsultation(ConsultationRequest request, Long userId, String role, boolean bypassAvailability) {
         Long providerId = resolveProviderId(request, userId, role);
 
         // Vérifier que le provider existe et a le rôle PROVIDER
@@ -63,10 +65,15 @@ public class ConsultationService {
             throw new IllegalArgumentException("L'utilisateur spécifié n'est pas un médecin/infirmier valide");
         }
 
-        // Vérifier que le créneau est dans la disponibilité du provider
+        // Vérifier que le créneau est dans la disponibilité du provider (sauf si bypassé)
         LocalDateTime endTime = request.getEndTime() != null ? request.getEndTime()
                 : request.getStartTime().plus(30, ChronoUnit.MINUTES);
-        validateTimeSlotWithinAvailability(providerId, request.getStartTime(), endTime);
+        
+        if (!bypassAvailability) {
+            validateTimeSlotWithinAvailability(providerId, request.getStartTime(), endTime);
+        } else {
+            logger.info("Bypassing availability check for provider {} as requested", providerId);
+        }
 
         // Vérifier qu'il n'y a pas de chevauchement avec d'autres consultations du provider
         List<Consultation> overlapping = repository.findOverlappingConsultations(providerId, request.getStartTime(), endTime);
@@ -209,31 +216,126 @@ public class ConsultationService {
     @Transactional(readOnly = true)
     public List<ConsultationResponse> getAllConsultations() {
         return repository.findAll().stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ConsultationResponse> getConsultationsByProvider(Long providerId) {
+        if (providerId == null) return List.of();
         return repository.findByProviderId(providerId).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ConsultationResponse> getConsultationsByPatient(Long patientId) {
+        if (patientId == null) return List.of();
         return repository.findByPatientId(patientId).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ConsultationResponse> getConsultationsByCaregiver(Long caregiverId) {
-        // Deux approches : soit on a un champ caregiverId dans la consultation, soit on récupère les patients associés
-        // Ici on utilise le champ caregiverId pour simplifier.
+        if (caregiverId == null) return List.of();
         return repository.findByCaregiverId(caregiverId).stream()
-                .map(this::mapToResponse)
+                .map(this::mapToResponseSafe)
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    private ConsultationResponse mapToResponseSafe(Consultation c) {
+        if (c == null) return null;
+        try {
+            return mapToResponse(c);
+        } catch (Exception e) {
+            logger.error("Error mapping consultation {} to response: {}", c.getId(), e.getMessage());
+            // Return a minimal response instead of failing the whole list
+            ConsultationResponse minimal = new ConsultationResponse();
+            minimal.setId(c.getId());
+            minimal.setTitle(c.getTitle() != null ? c.getTitle() : "Consultation");
+            minimal.setStartTime(c.getStartTime());
+            minimal.setStatus(c.getStatus());
+            minimal.setType(c.getType());
+            minimal.setProviderId(c.getProviderId());
+            minimal.setPatientId(c.getPatientId());
+            minimal.setCaregiverId(c.getCaregiverId());
+            return minimal;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getGlobalStatistics() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", repository.count());
+        stats.put("byStatus", convertToMap(repository.countByStatus()));
+        stats.put("byType", convertToMap(repository.countByType()));
+
+        // Monthly distribution (Jointure temporelle)
+        int currentYear = java.time.Year.now().getValue();
+        stats.put("monthlyDistribution", convertToMap(repository.countByMonthName(currentYear)));
+
+        // Top Patients (Jointure applicative avec User Service)
+        List<Object[]> topIds = repository.findTopPatientIds();
+        List<Map<String, Object>> topEnriched = topIds.stream().limit(5).map(res -> {
+            Long id = (Long) res[0];
+            Long count = (Long) res[1];
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", id);
+            item.put("count", count);
+            try {
+                UserDto user = userServiceClient.getUserById(id);
+                item.put("name", user.getFirstName() + " " + user.getLastName());
+            } catch (Exception e) {
+                item.put("name", "Patient #" + id);
+            }
+            return item;
+        }).collect(Collectors.toList());
+        stats.put("topPatients", topEnriched);
+
+        return stats;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getProviderStatistics(Long providerId) {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", repository.findByProviderId(providerId).size());
+        stats.put("byStatus", convertToMap(repository.countByStatusAndProviderId(providerId)));
+        stats.put("byType", convertToMap(repository.countByTypeAndProviderId(providerId)));
+
+        // Top Patients for this provider (Enriched Join)
+        List<Object[]> topIds = repository.findTopPatientIdsByProviderId(providerId);
+        List<Map<String, Object>> topEnriched = topIds.stream().limit(5).map(res -> {
+            Long id = (Long) res[0];
+            Long count = (Long) res[1];
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", id);
+            item.put("count", count);
+            try {
+                UserDto user = userServiceClient.getUserById(id);
+                item.put("name", user.getFirstName() + " " + user.getLastName());
+            } catch (Exception e) {
+                item.put("name", "Patient #" + id);
+            }
+            return item;
+        }).collect(Collectors.toList());
+        stats.put("topPatients", topEnriched);
+
+        return stats;
+    }
+
+    private Map<String, Long> convertToMap(List<Object[]> results) {
+        Map<String, Long> map = new HashMap<>();
+        for (Object[] res : results) {
+            String label = res[0].toString();
+            Long count = (Long) res[1];
+            map.put(label, count);
+        }
+        return map;
     }
 
     @Transactional(readOnly = true)
@@ -312,6 +414,8 @@ public class ConsultationService {
     }
 
     private ConsultationResponse mapToResponse(Consultation c) {
+        if (c == null) return null;
+        
         ConsultationResponse resp = new ConsultationResponse();
         resp.setId(c.getId());
         resp.setTitle(c.getTitle());
@@ -325,6 +429,29 @@ public class ConsultationService {
         resp.setPatientId(c.getPatientId());
         resp.setCaregiverId(c.getCaregiverId());
         resp.setCreatedAt(c.getCreatedAt());
+
+        // Fill names if possible - Robust checks to avoid any potential 500 when listing
+        try {
+            if (c.getPatientId() != null) {
+                UserDto patient = userServiceClient.getUserById(c.getPatientId());
+                if (patient != null) {
+                    String firstValue = patient.getFirstName() != null ? patient.getFirstName() : "";
+                    String lastValue = patient.getLastName() != null ? patient.getLastName() : "";
+                    resp.setPatientName((firstValue + " " + lastValue).trim());
+                }
+            }
+            if (c.getProviderId() != null) {
+                UserDto provider = userServiceClient.getUserById(c.getProviderId());
+                if (provider != null) {
+                    String firstValue = provider.getFirstName() != null ? provider.getFirstName() : "";
+                    String lastValue = provider.getLastName() != null ? provider.getLastName() : "";
+                    resp.setProviderName((firstValue + " " + lastValue).trim());
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Non-critical error fetching participant names for consultation {}: {}", c.getId(), e.getMessage());
+        }
+
         return resp;
     }
 }

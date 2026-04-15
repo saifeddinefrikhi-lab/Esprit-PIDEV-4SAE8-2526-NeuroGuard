@@ -77,7 +77,7 @@ export const NavigationItems: NavigationItem[] = [
         id: 'reservation',
         title: 'Make a Reservation',
         type: 'item',
-        url: '/patient/reservation',
+        url: '/patient/reservations',
         icon: 'calendar'
       },
       {

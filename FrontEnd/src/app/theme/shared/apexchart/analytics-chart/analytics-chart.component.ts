@@ -1,5 +1,5 @@
 // angular import
-import { Component, viewChild } from '@angular/core';
+import { Component, viewChild, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 
 // project import
 
@@ -12,13 +12,26 @@ import { NgApexchartsModule, ChartComponent, ApexOptions } from 'ng-apexcharts';
   templateUrl: './analytics-chart.component.html',
   styleUrl: './analytics-chart.component.scss'
 })
-export class AnalyticsChartComponent {
+export class AnalyticsChartComponent implements OnInit, OnChanges {
   // public props
+  @Input() chartData: number[] = [];
+  @Input() chartCategories: string[] = [];
+  @Input() seriesName: string = 'Consultations';
+
   chart = viewChild.required<ChartComponent>('chart');
   chartOptions!: Partial<ApexOptions>;
 
-  //  constructor
-  constructor() {
+  ngOnInit(): void {
+    this.updateOptions();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ((changes['chartData'] || changes['chartCategories']) && this.chartOptions) {
+      this.updateOptions();
+    }
+  }
+
+  updateOptions(): void {
     this.chartOptions = {
       chart: {
         type: 'line',
@@ -34,36 +47,28 @@ export class AnalyticsChartComponent {
           borderRadius: 4
         }
       },
-      colors: ['#FFB814'],
+      colors: ['#4f46e5'],
       stroke: {
         curve: 'smooth',
-        width: 1.5
+        width: 3
       },
       grid: {
         strokeDashArray: 4,
-        borderColor: '#f5f5f5'
+        borderColor: '#f1f5f9'
       },
       series: [
         {
-          data: [58, 90, 38, 83, 63, 75, 35, 55]
+          name: this.seriesName,
+          data: this.chartData.length > 0 ? this.chartData : [58, 90, 38, 83, 63, 75, 35, 55]
         }
       ],
       xaxis: {
-        type: 'datetime',
-        categories: [
-          '2018-05-19T00:00:00.000Z',
-          '2018-06-19T00:00:00.000Z',
-          '2018-07-19T01:30:00.000Z',
-          '2018-08-19T02:30:00.000Z',
-          '2018-09-19T03:30:00.000Z',
-          '2018-10-19T04:30:00.000Z',
-          '2018-11-19T05:30:00.000Z',
-          '2018-12-19T06:30:00.000Z'
-        ],
+        type: 'category',
+        categories: this.chartCategories.length > 0 ? this.chartCategories : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
         labels: {
-          format: 'MMM',
           style: {
-            colors: ['#222', '#222', '#222', '#222', '#222', '#222', '#222']
+            colors: (this.chartCategories.length > 0 ? this.chartCategories : [1,2,3,4,5,6,7,8,9,10,11,12]).map(() => '#94a3b8'),
+            fontSize: '12px'
           }
         },
         axisBorder: {
@@ -74,7 +79,13 @@ export class AnalyticsChartComponent {
         }
       },
       yaxis: {
-        show: false
+        show: true,
+        labels: {
+          style: {
+            colors: ['#94a3b8'],
+            fontSize: '12px'
+          }
+        }
       },
       tooltip: {
         theme: 'light'
