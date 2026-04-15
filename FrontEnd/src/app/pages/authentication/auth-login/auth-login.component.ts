@@ -99,16 +99,16 @@ export class AuthLoginComponent {
                   (position) => {
                     localStorage.setItem('patientLat', position.coords.latitude.toString());
                     localStorage.setItem('patientLon', position.coords.longitude.toString());
-                    this.router.navigate(['/patient/find-nearby-doctors']);
+                    this.router.navigate(['/patient/home']);
                   },
                   (error) => {
                     console.warn('Geolocation failed during login, redirecting anyway');
-                    this.router.navigate(['/patient/find-nearby-doctors']);
+                    this.router.navigate(['/patient/home']);
                   },
                   { timeout: 3000, enableHighAccuracy: true }
                 );
               } else {
-                this.router.navigate(['/patient/find-nearby-doctors']);
+                this.router.navigate(['/patient/home']);
               }
             } else {
               this.authService.redirectBasedOnRole(userRole);

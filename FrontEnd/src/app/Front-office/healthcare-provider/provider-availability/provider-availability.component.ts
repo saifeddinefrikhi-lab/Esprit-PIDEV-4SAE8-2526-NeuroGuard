@@ -59,7 +59,7 @@ export class ProviderAvailabilityComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.error = err?.error?.message || err?.message || 'Impossible de charger les disponibilités.';
+        this.error = err?.error?.message || err?.message || 'Unable to load availability.';
         this.loading = false;
         this.cdr.detectChanges();
       }
@@ -100,18 +100,18 @@ export class ProviderAvailabilityComponent implements OnInit {
     if (this.editingId) {
       this.availabilityService.update(this.editingId, req).subscribe({
         next: () => { this.load(); this.cancel(); },
-        error: (err) => this.error = err?.error?.message || err?.message || 'Erreur lors de la mise à jour.'
+        error: (err) => this.error = err?.error?.message || err?.message || 'Error while updating.'
       });
     } else {
       this.availabilityService.create(req).subscribe({
         next: () => { this.load(); this.cancel(); },
-        error: (err) => this.error = err?.error?.message || err?.message || 'Erreur lors de la création.'
+        error: (err) => this.error = err?.error?.message || err?.message || 'Error while creating.'
       });
     }
   }
 
   delete(id: number): void {
-    if (!confirm('Supprimer cette plage horaire ?')) return;
+    if (!confirm('Delete this time slot?')) return;
     const previous = [...this.availabilities];
     this.availabilities = this.availabilities.filter(av => av.id !== id);
     this.cdr.detectChanges();
@@ -119,7 +119,7 @@ export class ProviderAvailabilityComponent implements OnInit {
       next: () => { /* déjà mis à jour */ },
       error: (err) => {
         this.availabilities = previous;
-        this.error = err?.error?.message || err?.message || 'Erreur lors de la suppression.';
+        this.error = err?.error?.message || err?.message || 'Error while deleting.';
         this.cdr.detectChanges();
       }
     });

@@ -59,7 +59,7 @@ export class DefaultComponent implements OnInit {
   recentActivities: any[] = [];
   
   chartData: number[] = [0, 0, 0, 0];
-  chartLabels: string[] = ['En ligne', 'Présentiel', 'Complété', 'Prévu'];
+  chartLabels: string[] = ['Online', 'In-Person', 'Completed', 'Scheduled'];
   
   typeChartOptions!: Partial<ApexOptions>;
   statusChartOptions!: Partial<ApexOptions>;
@@ -124,7 +124,7 @@ export class DefaultComponent implements OnInit {
         // Map real consultations to recent activities
         this.recentActivities = (consultations ?? []).slice(0, 8).map(c => ({
           title: c.title,
-          time: new Date(c.startTime).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+          time: new Date(c.startTime).toLocaleString('en-US', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
           type: c.type,
           status: c.status,
           patientId: c.patientId
@@ -133,8 +133,8 @@ export class DefaultComponent implements OnInit {
         this.AnalyticEcommerce = [
           { title: 'Base Patients', amount: String(patientsCount), background: 'bg-light-primary ', icon: 'user' },
           { title: 'Total Consultations', amount: String(consultationsCount), background: 'bg-light-success ', icon: 'schedule' },
-          { title: 'Réservations Archivées', amount: String(this.resStats.total), background: 'bg-light-warning ', icon: 'calendar' },
-          { title: 'Consultations en Cours', amount: String(byStatus['ONGOING'] || 0), background: 'bg-light-info ', icon: 'medicine-box' }
+          { title: 'Archived Reservations', amount: String(this.resStats.total), background: 'bg-light-warning ', icon: 'calendar' },
+          { title: 'Ongoing Consultations', amount: String(byStatus['ONGOING'] || 0), background: 'bg-light-info ', icon: 'medicine-box' }
         ];
 
         this.updateChartData(byType, byStatus, advStats?.monthlyDistribution);
@@ -143,7 +143,7 @@ export class DefaultComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.statsError = err?.error?.message || err?.message || 'Impossible de charger les statistiques.';
+        this.statsError = err?.error?.message || err?.message || 'Unable to load statistics.';
         this.statsLoading = false;
         this.cdr.detectChanges();
       }
@@ -174,7 +174,7 @@ export class DefaultComponent implements OnInit {
     this.typeChartOptions = {
       series: typeValues,
       chart: { type: 'donut', height: 220, animations: { enabled: true, speed: 800 } },
-      labels: ['En ligne', 'Présentiel'],
+      labels: ['Online', 'In-Person'],
       colors: ['#4f46e5', '#10b981'],
       legend: { position: 'bottom' },
       dataLabels: { enabled: false },
@@ -199,10 +199,10 @@ export class DefaultComponent implements OnInit {
       this.resChartOptions = {
         series: resValues,
         chart: { type: 'donut', height: 220 },
-        labels: ['Acceptées', 'En attente', 'Rejetées'],
+        labels: ['Accepted', 'Pending', 'Rejected'],
         colors: ['#10b981', '#f59e0b', '#ef4444'],
         legend: { position: 'bottom' },
-        plotOptions: { pie: { donut: { size: '70%', labels: { show: true, total: { show: true, label: 'Réservations' } } } } }
+        plotOptions: { pie: { donut: { size: '70%', labels: { show: true, total: { show: true, label: 'Reservations' } } } } }
       };
     }
   }

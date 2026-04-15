@@ -43,7 +43,7 @@ export class AdminConsultationsComponent implements OnInit {
         this.loading = false;
       },
       error: (err) => {
-        this.error = err?.error?.message || err?.message || 'Impossible de charger les consultations.';
+        this.error = err?.error?.message || err?.message || 'Unable to load consultations.';
         this.loading = false;
       }
     });

@@ -118,7 +118,7 @@ export class ProviderConsultationsComponent implements OnInit {
       error: (err) => {
         setTimeout(() => {
           this.patientsLoading = false;
-          this.patientLoadError = err?.message || 'Impossible de charger la liste des patients.';
+          this.patientLoadError = err?.message || 'Unable to load patient list.';
           this.cdr.detectChanges();
         });
       }
@@ -139,7 +139,7 @@ export class ProviderConsultationsComponent implements OnInit {
       error: (err) => {
         setTimeout(() => {
           this.caregiversLoading = false;
-          this.caregiverLoadError = err?.message || 'Impossible de charger la liste des soignants.';
+          this.caregiverLoadError = err?.message || 'Unable to load caregiver list.';
           this.cdr.detectChanges();
         });
       }
@@ -230,7 +230,7 @@ export class ProviderConsultationsComponent implements OnInit {
           this.router.navigate(['/provider/consultations']);
         },
         error: (err) => {
-          this.submitError = err?.error?.message || err?.message || 'Erreur lors de la mise à jour.';
+          this.submitError = err?.error?.message || err?.message || 'Error while updating.';
         }
       });
     } else {
@@ -241,7 +241,7 @@ export class ProviderConsultationsComponent implements OnInit {
           this.router.navigate(['/provider/consultations']);
         },
         error: (err) => {
-          this.submitError = err?.error?.message || err?.message || 'Erreur lors de la création. Vérifiez que la Gateway et le service consultation sont démarrés.';
+          this.submitError = err?.error?.message || err?.message || 'Error while creating. Verify that Gateway and consultation service are running.';
         }
       });
     }
@@ -259,7 +259,7 @@ export class ProviderConsultationsComponent implements OnInit {
   }
 
   deleteConsultation(id: number): void {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette consultation ?')) {
+    if (confirm('Are you sure you want to delete this consultation?')) {
       const previous = [...this.consultations];
       this.consultations = this.consultations.filter(c => c.id !== id);
       this.cdr.detectChanges();
@@ -286,7 +286,7 @@ export class ProviderConsultationsComponent implements OnInit {
           this.cdr.detectChanges();
         });
       },
-      error: (err) => alert('Impossible de rejoindre : ' + (err?.message || err))
+      error: (err) => alert('Unable to join: ' + (err?.message || err))
     });
   }
 

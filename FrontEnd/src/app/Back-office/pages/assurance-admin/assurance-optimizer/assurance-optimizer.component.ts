@@ -37,12 +37,12 @@ export class AssuranceOptimizerComponent implements OnInit {
   // Simulation State
   patientId: number = 1; 
   procedures = [
-    { id: 'CONSULTATION_GENERAL', name: 'Consultation Générale' },
-    { id: 'CONSULTATION_SPECIALIST', name: 'Consultation Spécialiste' },
+    { id: 'CONSULTATION_GENERAL', name: 'General Consultation' },
+    { id: 'CONSULTATION_SPECIALIST', name: 'Specialist Consultation' },
     { id: 'MRI_SCAN', name: 'Scanner / IRM' },
-    { id: 'BLOOD_TEST', name: 'Analyses de Sang' },
-    { id: 'COGNITIVE_THERAPY', name: 'Thérapie Cognitive' },
-    { id: 'HOME_CARE_SESSION', name: 'Aide à Domicile' }
+    { id: 'BLOOD_TEST', name: 'Blood Tests' },
+    { id: 'COGNITIVE_THERAPY', name: 'Cognitive Therapy' },
+    { id: 'HOME_CARE_SESSION', name: 'Home Care' }
   ];
   selectedProcedure: string = 'CONSULTATION_GENERAL';
   simulationResult: any = null;

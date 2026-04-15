@@ -61,7 +61,7 @@ export class ProviderConsultationHistoryComponent implements OnInit {
         this.loadPatientsAndCaregivers();
       },
       error: (err) => {
-        this.error = err?.error?.message || err?.message || 'Impossible de charger l\'historique.';
+        this.error = err?.error?.message || err?.message || 'Unable to load history.';
         this.loading = false;
         this.cdr.detectChanges();
       }
@@ -77,7 +77,7 @@ export class ProviderConsultationHistoryComponent implements OnInit {
       byStatus['COMPLETED'] || 0,
       byStatus['SCHEDULED'] || 0
     ];
-    this.chartLabels = ['En ligne', 'Présentiel', 'Complété', 'Prévu'];
+    this.chartLabels = ['Online', 'In-Person', 'Completed', 'Scheduled'];
   }
 
   loadPatientsAndCaregivers(): void {
@@ -144,7 +144,7 @@ export class ProviderConsultationHistoryComponent implements OnInit {
         this.showMeetingModal = true;
         this.cdr.detectChanges();
       },
-      error: (err) => alert('Impossible de rejoindre : ' + (err?.message || err))
+      error: (err) => alert('Unable to join: ' + (err?.message || err))
     });
   }
 

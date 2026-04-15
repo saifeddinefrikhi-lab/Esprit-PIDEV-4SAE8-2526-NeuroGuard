@@ -1,15 +1,15 @@
 <div class="container mt-4">
   <div class="page-header d-flex align-items-center justify-content-between mb-4">
     <div>
-      <h2 class="mb-0">Gestion des consultations</h2>
-      <p class="text-muted small mb-0">Vue d'ensemble de toutes les consultations</p>
+      <h2 class="mb-0">Consultation Management</h2>
+      <p class="text-muted small mb-0">Overview of all consultations</p>
     </div>
     <button class="btn btn-primary" (click)="refresh()">
-      <span class="me-1">↻</span> Actualiser
+      <span class="me-1">↻</span> Refresh
     </button>
   </div>
 
-  <div *ngIf="loading" class="alert alert-info">Chargement en cours...</div>
+  <div *ngIf="loading" class="alert alert-info">Loading...</div>
   <div *ngIf="error" class="alert alert-danger">{{ error }}</div>
 
   <!-- Stats -->
@@ -23,49 +23,49 @@
     <div class="col-6 col-md-4 col-lg-2">
       <div class="stats-card stats-online">
         <div class="stats-value">{{ stats.online }}</div>
-        <div class="stats-label">En ligne</div>
+        <div class="stats-label">Online</div>
       </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="stats-card stats-presential">
         <div class="stats-value">{{ stats.presential }}</div>
-        <div class="stats-label">Présentiel</div>
+        <div class="stats-label">In-Person</div>
       </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="stats-card stats-scheduled">
         <div class="stats-value">{{ stats.scheduled }}</div>
-        <div class="stats-label">Planifiées</div>
+        <div class="stats-label">Scheduled</div>
       </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="stats-card stats-completed">
         <div class="stats-value">{{ stats.completed }}</div>
-        <div class="stats-label">Terminées</div>
+        <div class="stats-label">Completed</div>
       </div>
     </div>
     <div class="col-6 col-md-4 col-lg-2">
       <div class="stats-card stats-cancelled">
         <div class="stats-value">{{ stats.cancelled }}</div>
-        <div class="stats-label">Annulées</div>
+        <div class="stats-label">Cancelled</div>
       </div>
     </div>
   </div>
 
   <div class="card" *ngIf="!loading && !error">
-    <div class="card-header">Toutes les consultations</div>
+    <div class="card-header">All Consultations</div>
     <div class="card-body p-0">
       <table class="table table-striped modern-table mb-0" *ngIf="consultations.length > 0">
         <thead>
           <tr>
             <th>ID</th>
-            <th>Titre</th>
+            <th>Title</th>
             <th>Provider</th>
             <th>Patient</th>
-            <th>Soignant</th>
+            <th>Caregiver</th>
             <th>Date</th>
             <th>Type</th>
-            <th>Statut</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
@@ -76,7 +76,7 @@
             <td>{{ c.patientId }}</td>
             <td>{{ c.caregiverId ? c.caregiverId : '-' }}</td>
             <td>{{ formatDateTime(c.startTime) }}</td>
-            <td>{{ c.type === 'ONLINE' ? 'En ligne' : 'Présentiel' }}</td>
+            <td>{{ c.type === 'ONLINE' ? 'Online' : 'In-Person' }}</td>
             <td>
               <span class="status-badge" [ngClass]="{
                 'scheduled': c.status === 'SCHEDULED',
@@ -89,7 +89,7 @@
         </tbody>
       </table>
       <div *ngIf="consultations.length === 0" class="p-4 text-center text-muted">
-        Aucune consultation trouvée.
+        No consultations found.
       </div>
     </div>
   </div>

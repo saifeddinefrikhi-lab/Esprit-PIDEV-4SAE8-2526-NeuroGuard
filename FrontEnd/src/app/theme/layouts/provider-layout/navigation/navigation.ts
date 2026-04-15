@@ -110,7 +110,7 @@ export const NavigationItems: NavigationItem[] = [
     children: [
       {
         id: 'my-availability',
-        title: 'Mes disponibilités',
+        title: 'My Availability',
         type: 'item',
         url: '/provider/availability',
         classes: 'nav-item',

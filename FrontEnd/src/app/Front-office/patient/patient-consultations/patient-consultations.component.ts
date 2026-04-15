@@ -38,8 +38,8 @@ export class PatientConsultationsComponent implements OnInit {
         this.consultations = data;
         this.loading = false;
       },
-      error: (err) => {
-        this.error = err?.error?.message || err?.message || 'Impossible de charger les consultations.';
+        error: (err) => {
+          this.error = err?.error?.message || err?.message || 'Unable to load consultations.';
         this.loading = false;
       }
     });
@@ -53,7 +53,7 @@ export class PatientConsultationsComponent implements OnInit {
         this.meetingUrl = this.sanitizer.bypassSecurityTrustResourceUrl(link + '#config.prejoinPageEnabled=false');
         this.showMeetingModal = true;
       },
-      error: (err) => alert('Impossible de rejoindre : ' + (err?.message || err))
+        error: (err) => alert('Unable to join: ' + (err?.message || err))
     });
   }
 

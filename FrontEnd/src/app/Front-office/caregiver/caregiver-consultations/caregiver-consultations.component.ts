@@ -147,7 +147,7 @@ export class CaregiverConsultationsComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.submitError = err?.error?.message || err?.message || 'Ce médecin est indisponible à ce créneau. Vérifiez ses disponibilités.';
+        this.submitError = err?.error?.message || err?.message || 'This doctor is unavailable for this time slot. Please check availability.';
         this.cdr.detectChanges();
       }
     });
@@ -162,7 +162,7 @@ export class CaregiverConsultationsComponent implements OnInit {
         setTimeout(() => { this.loading = false; this.cdr.detectChanges(); });
       },
       error: (err) => {
-        this.error = err?.error?.message || err?.message || 'Impossible de charger les consultations.';
+        this.error = err?.error?.message || err?.message || 'Unable to load consultations.';
         setTimeout(() => { this.loading = false; this.cdr.detectChanges(); });
       }
     });
@@ -176,7 +176,7 @@ export class CaregiverConsultationsComponent implements OnInit {
         this.meetingUrl = this.sanitizer.bypassSecurityTrustResourceUrl(link + '#config.prejoinPageEnabled=false');
         this.showMeetingModal = true;
       },
-      error: (err) => alert('Impossible de rejoindre : ' + (err?.message || err))
+      error: (err) => alert('Unable to join: ' + (err?.message || err))
     });
   }
 
