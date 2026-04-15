@@ -8,6 +8,7 @@ public class UserDto {
     private String firstName;
     private String lastName;
     private String role;
+    private boolean isConnected;
 
     // Getters and Setters
     public Long getId() {
@@ -56,5 +57,13 @@ public class UserDto {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public boolean isConnected() {
+        return isConnected;
+    }
+
+    public void setConnected(boolean connected) {
+        isConnected = connected;
     }
 }

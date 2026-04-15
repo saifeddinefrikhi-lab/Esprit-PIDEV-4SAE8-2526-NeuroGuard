@@ -153,6 +153,14 @@ export class AuthService {
 
   // Logout the user and clear token
   logout() {
+    // Notify the backend so it can invalidate the token and clear the lastSeen status immediately
+    this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({
+      next: () => this.clearLocalSession(),
+      error: () => this.clearLocalSession() // Clear it even if backend fails
+    });
+  }
+
+  private clearLocalSession() {
     localStorage.removeItem('authToken');
     this.currentUser = null;
     this.isLoggedInSubject.next(false);

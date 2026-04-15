@@ -58,6 +58,7 @@ public class AuthController {
         String token = userService.loginUser(loginRequest.getUsername(), loginRequest.getPassword());
 
         if (token != null) {
+            userService.updateLastSeen(loginRequest.getUsername());
             Map<String, Object> response = new HashMap<>();
             response.put("token", token);
             response.put("message", "Login successful");
@@ -212,6 +213,8 @@ public class AuthController {
 
             // Validate the token before invalidating
             if (jwtUtils.validateJwtToken(jwt)) {
+                String username = jwtUtils.getUsernameFromJwtToken(jwt);
+                userService.clearLastSeen(username);
                 jwtUtils.invalidateToken(jwt);
                 SecurityContextHolder.clearContext();
                 response.put("message", "User logged out successfully");

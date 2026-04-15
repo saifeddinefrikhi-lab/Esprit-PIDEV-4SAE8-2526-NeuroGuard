@@ -66,6 +66,20 @@ public class UserService implements UserDetailsService {
                 .build();
     }
 
+    public void updateLastSeen(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            user.setLastSeen(java.time.LocalDateTime.now());
+            userRepository.save(user);
+        });
+    }
+
+    public void clearLastSeen(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            user.setLastSeen(null);
+            userRepository.save(user);
+        });
+    }
+
     // In UserService.java
 
     public List<UserDto> getAllUsers() {
@@ -141,6 +155,15 @@ public class UserService implements UserDetailsService {
         dto.setFirstName(user.getFirstName());
         dto.setLastName(user.getLastName());
         dto.setRole(user.getRole().name());
+        
+        // Check if user has been active in the last 15 minutes
+        if (user.getLastSeen() != null) {
+            java.time.LocalDateTime fifteenMinutesAgo = java.time.LocalDateTime.now().minusMinutes(15);
+            dto.setConnected(user.getLastSeen().isAfter(fifteenMinutesAgo));
+        } else {
+            dto.setConnected(false);
+        }
+        
         return dto;
     }
 

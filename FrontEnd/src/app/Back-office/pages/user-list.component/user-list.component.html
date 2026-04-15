@@ -54,7 +54,10 @@
         </thead>
         <tbody>
           <tr *ngFor="let user of filteredUsers">
-            <td class="fw-medium">{{ user.username }}</td>
+            <td class="fw-medium">
+              <span class="status-dot" [ngClass]="user.connected ? 'online' : 'offline'" title="{{ user.connected ? 'Online' : 'Offline' }}"></span>
+              {{ user.username }}
+            </td>
             <td>{{ user.email }}</td>
             <td>{{ user.firstName }}</td>
             <td>{{ user.lastName }}</td>

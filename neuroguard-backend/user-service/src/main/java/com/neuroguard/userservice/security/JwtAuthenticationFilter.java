@@ -16,11 +16,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+import com.neuroguard.userservice.services.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+
+    @Autowired
+    private UserService userService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -64,6 +70,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         request.setAttribute("userRole", role);
 
         SecurityContextHolder.getContext().setAuthentication(authToken);
+
+        // Update last seen status
+        if (userService != null) {
+            userService.updateLastSeen(username);
+        }
+
         chain.doFilter(request, response);
     }
 

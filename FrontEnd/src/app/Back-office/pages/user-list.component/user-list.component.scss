@@ -223,6 +223,25 @@
   font-weight: 500;
 }
 
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 0.5rem;
+
+  &.online {
+    background-color: var(--bs-success, #198754);
+    box-shadow: 0 0 5px rgba(25, 135, 84, 0.5);
+  }
+
+  &.offline {
+    background-color: var(--bs-secondary, #6c757d);
+    opacity: 0.5;
+  }
+}
+
 .role-badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
