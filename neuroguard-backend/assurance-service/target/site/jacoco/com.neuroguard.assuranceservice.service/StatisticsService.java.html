@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">assurance-service</a> &gt; <a href="index.source.html" class="el_package">com.neuroguard.assuranceservice.service</a> &gt; <span class="el_source">StatisticsService.java</span></div><h1>StatisticsService.java</h1><pre class="source lang-java linenums">package com.neuroguard.assuranceservice.service;
+
+import com.neuroguard.assuranceservice.dto.StatisticsDto;
+import com.neuroguard.assuranceservice.dto.StatisticsDto.*;
+import com.neuroguard.assuranceservice.entity.Assurance;
+import com.neuroguard.assuranceservice.entity.CoverageRiskAssessment;
+import com.neuroguard.assuranceservice.repository.AssuranceRepository;
+import com.neuroguard.assuranceservice.repository.CoverageRiskAssessmentRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L18">@Slf4j</span>
+public class StatisticsService {
+
+    private final AssuranceRepository assuranceRepository;
+    private final CoverageRiskAssessmentRepository riskAssessmentRepository;
+
+    /**
+     * Calculate patient-level statistics
+     */
+    public PatientStatistics getPatientStatistics(Long patientId) {
+<span class="fc" id="L28">        log.info(&quot;Calculating statistics for patient: {}&quot;, patientId);</span>
+        
+<span class="fc" id="L30">        PatientStatistics stats = new PatientStatistics();</span>
+<span class="fc" id="L31">        stats.setPatientId(patientId);</span>
+        
+        // Get all assurances for patient
+<span class="fc" id="L34">        List&lt;Assurance&gt; patientAssurances = assuranceRepository.findByPatientId(patientId);</span>
+<span class="fc" id="L35">        stats.setTotalAssurances(patientAssurances.size());</span>
+        
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (patientAssurances.isEmpty()) {</span>
+<span class="fc" id="L38">            log.warn(&quot;No assurances found for patient: {}&quot;, patientId);</span>
+<span class="fc" id="L39">            return stats;</span>
+        }
+        
+        // Get all risk assessments for patient
+<span class="fc" id="L43">        List&lt;CoverageRiskAssessment&gt; assessments = patientAssurances.stream()</span>
+<span class="fc" id="L44">                .map(Assurance::getCoverageRiskAssessment)</span>
+<span class="fc" id="L45">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L46">                .collect(Collectors.toList());</span>
+        
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (assessments.isEmpty()) {</span>
+<span class="fc" id="L49">            return stats;</span>
+        }
+        
+        // ============ RISK METRICS CALCULATIONS ============
+<span class="fc" id="L53">        List&lt;Double&gt; riskScores = assessments.stream()</span>
+<span class="fc" id="L54">                .map(CoverageRiskAssessment::getAlzheimersPredictionScore)</span>
+<span class="fc" id="L55">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L57">        stats.setAverageAlzheimersRisk(calculateMean(riskScores));</span>
+<span class="fc" id="L58">        stats.setHighestAlzheimersRisk(riskScores.stream().max(Double::compareTo).orElse(0.0));</span>
+<span class="fc" id="L59">        stats.setLowestAlzheimersRisk(riskScores.stream().min(Double::compareTo).orElse(0.0));</span>
+<span class="fc" id="L60">        stats.setStandardDeviationRisk(calculateStandardDeviation(riskScores));</span>
+        
+        // ============ COST METRICS CALCULATIONS ============
+<span class="fc" id="L63">        List&lt;Double&gt; costs = assessments.stream()</span>
+<span class="fc" id="L64">                .map(CoverageRiskAssessment::getEstimatedAnnualClaimCost)</span>
+<span class="fc" id="L65">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L67">        stats.setTotalEstimatedCost(calculateSum(costs));</span>
+<span class="fc" id="L68">        stats.setAverageAnnualCost(calculateMean(costs));</span>
+<span class="fc" id="L69">        stats.setMedianAnnualCost(calculateMedian(costs));</span>
+        
+        // ============ ALERT METRICS ============
+<span class="fc" id="L72">        Integer totalAlerts = assessments.stream()</span>
+<span class="fc" id="L73">                .mapToInt(CoverageRiskAssessment::getActiveAlertCount)</span>
+<span class="fc" id="L74">                .sum();</span>
+<span class="fc" id="L75">        stats.setTotalActiveAlerts(totalAlerts);</span>
+<span class="fc" id="L76">        stats.setAverageAlertsPerAssurance((double) totalAlerts / assessments.size());</span>
+        
+<span class="fc" id="L78">        List&lt;String&gt; severities = assessments.stream()</span>
+<span class="fc" id="L79">                .map(CoverageRiskAssessment::getHighestAlertSeverity)</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">                .filter(s -&gt; &quot;CRITICAL&quot;.equals(s) || &quot;WARNING&quot;.equals(s))</span>
+<span class="fc" id="L81">                .collect(Collectors.toList());</span>
+<span class="fc" id="L82">        stats.setHighestSeverityAlerts(severities);</span>
+        
+        // ============ COMPLEXITY METRICS ============
+<span class="fc" id="L85">        List&lt;Integer&gt; complexityScores = assessments.stream()</span>
+<span class="fc" id="L86">                .map(CoverageRiskAssessment::getMedicalComplexityScore)</span>
+<span class="fc" id="L87">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L89">        stats.setAverageComplexityScore(calculateMeanInt(complexityScores));</span>
+<span class="fc" id="L90">        stats.setMaxComplexityScore(complexityScores.stream().max(Integer::compareTo).orElse(0));</span>
+        
+        // ============ PROCEDURE FREQUENCY ANALYSIS ============
+<span class="fc" id="L93">        Map&lt;String, Integer&gt; procedureFrequency = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L94">        assessments.forEach(assessment -&gt; {</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (assessment.getRecommendedProcedures() != null) {</span>
+<span class="fc" id="L96">                assessment.getRecommendedProcedures().forEach(proc -&gt;</span>
+<span class="fc" id="L97">                    procedureFrequency.merge(proc, 1, Integer::sum)</span>
+                );
+            }
+<span class="fc" id="L100">        });</span>
+<span class="fc" id="L101">        stats.setRecommendedProceduresFrequency(procedureFrequency);</span>
+        
+        // ============ CARE TEAM ANALYSIS ============
+<span class="fc" id="L104">        Integer totalProviders = assessments.stream()</span>
+<span class="fc" id="L105">                .mapToInt(CoverageRiskAssessment::getRecommendedProviderCount)</span>
+<span class="fc" id="L106">                .sum();</span>
+<span class="fc" id="L107">        stats.setCareTeamAverageSize(totalProviders / assessments.size());</span>
+        
+<span class="fc" id="L109">        long neuroReferrals = assessments.stream()</span>
+<span class="fc" id="L110">                .filter(CoverageRiskAssessment::getNeurologyReferralNeeded)</span>
+<span class="fc" id="L111">                .count();</span>
+<span class="fc" id="L112">        stats.setPatientsNeedingNeurology((int) neuroReferrals);</span>
+        
+<span class="fc" id="L114">        long geriatricReferrals = assessments.stream()</span>
+<span class="fc" id="L115">                .filter(CoverageRiskAssessment::getGeriatricAssessmentNeeded)</span>
+<span class="fc" id="L116">                .count();</span>
+<span class="fc" id="L117">        stats.setPatientsNeedingGeriatrics((int) geriatricReferrals);</span>
+        
+        // ============ OVERALL RISK LEVEL ============
+<span class="fc" id="L120">        Double avgRisk = stats.getAverageAlzheimersRisk();</span>
+<span class="fc" id="L121">        stats.setOverallRiskLevel(determineRiskLevel(avgRisk, stats.getAverageComplexityScore()));</span>
+        
+<span class="fc" id="L123">        log.info(&quot;Calculated statistics for patient: {} - Avg Risk: {}, Total Cost: ${}&quot;, </span>
+<span class="fc" id="L124">                 patientId, stats.getAverageAlzheimersRisk(), stats.getTotalEstimatedCost());</span>
+        
+<span class="fc" id="L126">        return stats;</span>
+    }
+
+    /**
+     * Calculate assurance-level statistics
+     */
+    public AssuranceStatistics getAssuranceStatistics(Long assuranceId) {
+<span class="fc" id="L133">        log.info(&quot;Calculating statistics for assurance: {}&quot;, assuranceId);</span>
+        
+<span class="fc" id="L135">        AssuranceStatistics stats = new AssuranceStatistics();</span>
+<span class="fc" id="L136">        stats.setAssuranceId(assuranceId);</span>
+        
+<span class="fc" id="L138">        Assurance assurance = assuranceRepository.findById(assuranceId).orElse(null);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (assurance == null) {</span>
+<span class="fc" id="L140">            log.warn(&quot;Assurance not found: {}&quot;, assuranceId);</span>
+<span class="fc" id="L141">            return stats;</span>
+        }
+        
+        // Get all risk assessments for this assurance
+<span class="fc" id="L145">        List&lt;CoverageRiskAssessment&gt; assessments = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (assurance.getCoverageRiskAssessment() != null) {</span>
+<span class="fc" id="L147">            assessments.add(assurance.getCoverageRiskAssessment());</span>
+        }
+        
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (assessments.isEmpty()) {</span>
+<span class="nc" id="L151">            return stats;</span>
+        }
+        
+        // ============ RISK METRICS ============
+<span class="fc" id="L155">        List&lt;Double&gt; riskScores = assessments.stream()</span>
+<span class="fc" id="L156">                .map(CoverageRiskAssessment::getAlzheimersPredictionScore)</span>
+<span class="fc" id="L157">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L159">        stats.setAverageRiskScore(calculateMean(riskScores));</span>
+        
+        // Count risk categories
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        long highRisk = riskScores.stream().filter(r -&gt; r &gt; 0.75).count();</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        long mediumRisk = riskScores.stream().filter(r -&gt; r &gt;= 0.5 &amp;&amp; r &lt;= 0.75).count();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        long lowRisk = riskScores.stream().filter(r -&gt; r &lt; 0.5).count();</span>
+        
+<span class="fc" id="L166">        stats.setPatientsHighRisk((int) highRisk);</span>
+<span class="fc" id="L167">        stats.setPatientsMediumRisk((int) mediumRisk);</span>
+<span class="fc" id="L168">        stats.setPatientsLowRisk((int) lowRisk);</span>
+<span class="fc" id="L169">        stats.setRiskDistribution((double) highRisk / assessments.size() * 100);</span>
+        
+        // ============ COST METRICS ============
+<span class="fc" id="L172">        List&lt;Double&gt; costs = assessments.stream()</span>
+<span class="fc" id="L173">                .map(CoverageRiskAssessment::getEstimatedAnnualClaimCost)</span>
+<span class="fc" id="L174">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L176">        stats.setTotalProjectedCost(calculateSum(costs));</span>
+<span class="fc" id="L177">        stats.setAverageClaimCost(calculateMean(costs));</span>
+<span class="fc" id="L178">        stats.setCostVariance(calculateVariance(costs));</span>
+<span class="fc" id="L179">        stats.setCostStandardDeviation(Math.sqrt(stats.getCostVariance()));</span>
+        
+        // ============ ALZHEIMER PREVALENCE ============
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        long highAlzRisk = riskScores.stream().filter(r -&gt; r &gt; 0.6).count();</span>
+<span class="fc" id="L183">        stats.setPatientsWithHighAlzRisk((int) highAlzRisk);</span>
+<span class="fc" id="L184">        stats.setAverageAlzheimersPrevalence((double) highAlzRisk / assessments.size() * 100);</span>
+        
+        // ============ PROCEDURE ANALYTICS ============
+<span class="fc" id="L187">        Map&lt;String, Integer&gt; procedureCount = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L188">        assessments.forEach(a -&gt; {</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (a.getRecommendedProcedures() != null) {</span>
+<span class="fc" id="L190">                a.getRecommendedProcedures().forEach(p -&gt;</span>
+<span class="fc" id="L191">                    procedureCount.merge(p, 1, Integer::sum)</span>
+                );
+            }
+<span class="fc" id="L194">        });</span>
+        
+<span class="fc" id="L196">        List&lt;ProcedureStatistic&gt; topProcedures = procedureCount.entrySet().stream()</span>
+<span class="fc" id="L197">                .sorted((a, b) -&gt; b.getValue().compareTo(a.getValue()))</span>
+<span class="fc" id="L198">                .limit(5)</span>
+<span class="fc" id="L199">                .map(e -&gt; new ProcedureStatistic(</span>
+<span class="fc" id="L200">                    e.getKey(),</span>
+<span class="fc" id="L201">                    e.getValue(),</span>
+<span class="fc" id="L202">                    (double) e.getValue() / assessments.size() * 100,</span>
+<span class="fc" id="L203">                    50.0 // Exemple de coût moyen</span>
+                ))
+<span class="fc" id="L205">                .collect(Collectors.toList());</span>
+        
+<span class="fc" id="L207">        stats.setTopRecommendedProcedures(topProcedures);</span>
+<span class="fc" id="L208">        stats.setTotalUniqueProcedures(procedureCount.size());</span>
+        
+        // ============ CARE COORDINATION ============
+<span class="fc" id="L211">        Integer totalProviders = assessments.stream()</span>
+<span class="fc" id="L212">                .mapToInt(CoverageRiskAssessment::getRecommendedProviderCount)</span>
+<span class="fc" id="L213">                .sum();</span>
+<span class="fc" id="L214">        stats.setAverageCareTeamSize(totalProviders / assessments.size());</span>
+        
+<span class="fc" id="L216">        long neuroNeeded = assessments.stream()</span>
+<span class="fc" id="L217">                .filter(CoverageRiskAssessment::getNeurologyReferralNeeded)</span>
+<span class="fc" id="L218">                .count();</span>
+<span class="fc" id="L219">        stats.setNeurology_referralsNeeded((int) neuroNeeded);</span>
+        
+<span class="fc" id="L221">        long geriatricNeeded = assessments.stream()</span>
+<span class="fc" id="L222">                .filter(CoverageRiskAssessment::getGeriatricAssessmentNeeded)</span>
+<span class="fc" id="L223">                .count();</span>
+<span class="fc" id="L224">        stats.setGeriatricsReferralsNeeded((int) geriatricNeeded);</span>
+        
+        // ============ PERFORMANCE RATING ============
+<span class="fc" id="L227">        Double avgRisk = stats.getAverageRiskScore();</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (avgRisk &lt; 0.4) {</span>
+<span class="nc" id="L229">            stats.setPerformanceRating(&quot;EXCELLENT&quot;);</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        } else if (avgRisk &lt; 0.6) {</span>
+<span class="nc" id="L231">            stats.setPerformanceRating(&quot;GOOD&quot;);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        } else if (avgRisk &lt; 0.75) {</span>
+<span class="nc" id="L233">            stats.setPerformanceRating(&quot;AVERAGE&quot;);</span>
+        } else {
+<span class="fc" id="L235">            stats.setPerformanceRating(&quot;POOR&quot;);</span>
+        }
+        
+<span class="fc" id="L238">        stats.setComparisonToNational(((avgRisk / 0.5) - 1) * 100); // Comparé à 0.5 (baseline)</span>
+        
+<span class="fc" id="L240">        log.info(&quot;Calculated statistics for assurance: {} - Avg Risk: {}, Total Cost: ${}&quot;, </span>
+<span class="fc" id="L241">                 assuranceId, stats.getAverageRiskScore(), stats.getTotalProjectedCost());</span>
+        
+<span class="fc" id="L243">        return stats;</span>
+    }
+
+    // ============ MATHEMATICAL HELPER METHODS ============
+
+    /**
+     * Calculate arithmetic mean
+     */
+    private Double calculateMean(List&lt;Double&gt; values) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (values.isEmpty()) return 0.0;</span>
+<span class="fc" id="L253">        return values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);</span>
+    }
+
+    private Double calculateMeanInt(List&lt;Integer&gt; values) {
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (values.isEmpty()) return 0.0;</span>
+<span class="fc" id="L258">        return values.stream().mapToInt(Integer::intValue).average().orElse(0.0);</span>
+    }
+
+    /**
+     * Calculate median
+     */
+    private Double calculateMedian(List&lt;Double&gt; values) {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (values.isEmpty()) return 0.0;</span>
+<span class="fc" id="L266">        List&lt;Double&gt; sorted = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L267">        Collections.sort(sorted);</span>
+<span class="fc" id="L268">        int size = sorted.size();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (size % 2 == 0) {</span>
+<span class="fc" id="L270">            return (sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2;</span>
+        } else {
+<span class="fc" id="L272">            return sorted.get(size / 2);</span>
+        }
+    }
+
+    /**
+     * Calculate sum
+     */
+    private Double calculateSum(List&lt;Double&gt; values) {
+<span class="fc" id="L280">        return values.stream().mapToDouble(Double::doubleValue).sum();</span>
+    }
+
+    /**
+     * Calculate standard deviation
+     */
+    private Double calculateStandardDeviation(List&lt;Double&gt; values) {
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (values.isEmpty()) return 0.0;</span>
+<span class="fc" id="L288">        Double mean = calculateMean(values);</span>
+<span class="fc" id="L289">        Double variance = calculateVariance(values);</span>
+<span class="fc" id="L290">        return Math.sqrt(variance);</span>
+    }
+
+    /**
+     * Calculate variance
+     */
+    private Double calculateVariance(List&lt;Double&gt; values) {
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (values.isEmpty()) return 0.0;</span>
+<span class="fc" id="L298">        Double mean = calculateMean(values);</span>
+<span class="fc" id="L299">        Double sumSquaredDiff = values.stream()</span>
+<span class="fc" id="L300">                .mapToDouble(v -&gt; Math.pow(v - mean, 2))</span>
+<span class="fc" id="L301">                .sum();</span>
+<span class="fc" id="L302">        return sumSquaredDiff / values.size();</span>
+    }
+
+    /**
+     * Determine overall risk level based on average Alzheimer risk and complexity
+     */
+    private String determineRiskLevel(Double alzheimersRisk, Double complexity) {
+<span class="fc" id="L309">        Double combinedScore = (alzheimersRisk * 100 + complexity) / 2;</span>
+        
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (combinedScore &lt; 25) return &quot;VERY_LOW&quot;;</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (combinedScore &lt; 45) return &quot;LOW&quot;;</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (combinedScore &lt; 65) return &quot;MODERATE&quot;;</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (combinedScore &lt; 85) return &quot;HIGH&quot;;</span>
+<span class="nc" id="L315">        return &quot;VERY_HIGH&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

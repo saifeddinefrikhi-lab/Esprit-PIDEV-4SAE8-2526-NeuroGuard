@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CoverageRiskAssessmentMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">assurance-service</a> &gt; <a href="index.source.html" class="el_package">com.neuroguard.assuranceservice.util</a> &gt; <span class="el_source">CoverageRiskAssessmentMapper.java</span></div><h1>CoverageRiskAssessmentMapper.java</h1><pre class="source lang-java linenums">package com.neuroguard.assuranceservice.util;
+
+import com.neuroguard.assuranceservice.dto.CoverageRiskAssessmentDto;
+import com.neuroguard.assuranceservice.entity.CoverageRiskAssessment;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="nc" id="L8">public class CoverageRiskAssessmentMapper {</span>
+
+    /**
+     * Convert entity to DTO
+     */
+    public CoverageRiskAssessmentDto toDto(CoverageRiskAssessment entity) {
+<span class="nc bnc" id="L14" title="All 2 branches missed.">        if (entity == null) {</span>
+<span class="nc" id="L15">            return null;</span>
+        }
+
+<span class="nc" id="L18">        CoverageRiskAssessmentDto dto = new CoverageRiskAssessmentDto();</span>
+<span class="nc" id="L19">        dto.setId(entity.getId());</span>
+<span class="nc" id="L20">        dto.setAssuranceId(entity.getAssuranceId());</span>
+<span class="nc" id="L21">        dto.setPatientId(entity.getPatientId());</span>
+<span class="nc" id="L22">        dto.setAlzheimersPredictionScore(entity.getAlzheimersPredictionScore());</span>
+<span class="nc" id="L23">        dto.setAlzheimersPredictionLevel(entity.getAlzheimersPredictionLevel());</span>
+<span class="nc" id="L24">        dto.setActiveAlertCount(entity.getActiveAlertCount());</span>
+<span class="nc" id="L25">        dto.setHighestAlertSeverity(entity.getHighestAlertSeverity());</span>
+<span class="nc" id="L26">        dto.setAlertSeverityRatio(entity.getAlertSeverityRatio());</span>
+<span class="nc" id="L27">        dto.setMedicalComplexityScore(entity.getMedicalComplexityScore());</span>
+<span class="nc" id="L28">        dto.setRecommendedCoverageLevel(entity.getRecommendedCoverageLevel());</span>
+<span class="nc" id="L29">        dto.setEstimatedAnnualClaimCost(entity.getEstimatedAnnualClaimCost());</span>
+<span class="nc" id="L30">        dto.setRecommendedProcedures(entity.getRecommendedProcedures());</span>
+<span class="nc" id="L31">        dto.setRecommendedProviderCount(entity.getRecommendedProviderCount());</span>
+<span class="nc" id="L32">        dto.setNeurologyReferralNeeded(entity.getNeurologyReferralNeeded());</span>
+<span class="nc" id="L33">        dto.setGeriatricAssessmentNeeded(entity.getGeriatricAssessmentNeeded());</span>
+<span class="nc" id="L34">        dto.setLastAssessmentDate(entity.getLastAssessmentDate());</span>
+<span class="nc" id="L35">        dto.setNextRecommendedAssessmentDate(entity.getNextRecommendedAssessmentDate());</span>
+<span class="nc" id="L36">        dto.setRiskStratum(entity.getRiskStratum());</span>
+<span class="nc" id="L37">        dto.setCreatedAt(entity.getCreatedAt());</span>
+<span class="nc" id="L38">        dto.setUpdatedAt(entity.getUpdatedAt());</span>
+<span class="nc" id="L39">        return dto;</span>
+    }
+
+    /**
+     * Convert DTO to entity (for creation)
+     */
+    public CoverageRiskAssessment toEntity(CoverageRiskAssessmentDto dto) {
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (dto == null) {</span>
+<span class="nc" id="L47">            return null;</span>
+        }
+
+<span class="nc" id="L50">        CoverageRiskAssessment entity = new CoverageRiskAssessment();</span>
+<span class="nc" id="L51">        entity.setId(dto.getId());</span>
+<span class="nc" id="L52">        entity.setAssuranceId(dto.getAssuranceId());</span>
+<span class="nc" id="L53">        entity.setPatientId(dto.getPatientId());</span>
+<span class="nc" id="L54">        entity.setAlzheimersPredictionScore(dto.getAlzheimersPredictionScore());</span>
+<span class="nc" id="L55">        entity.setAlzheimersPredictionLevel(dto.getAlzheimersPredictionLevel());</span>
+<span class="nc" id="L56">        entity.setActiveAlertCount(dto.getActiveAlertCount());</span>
+<span class="nc" id="L57">        entity.setHighestAlertSeverity(dto.getHighestAlertSeverity());</span>
+<span class="nc" id="L58">        entity.setAlertSeverityRatio(dto.getAlertSeverityRatio());</span>
+<span class="nc" id="L59">        entity.setMedicalComplexityScore(dto.getMedicalComplexityScore());</span>
+<span class="nc" id="L60">        entity.setRecommendedCoverageLevel(dto.getRecommendedCoverageLevel());</span>
+<span class="nc" id="L61">        entity.setEstimatedAnnualClaimCost(dto.getEstimatedAnnualClaimCost());</span>
+<span class="nc" id="L62">        entity.setRecommendedProcedures(dto.getRecommendedProcedures());</span>
+<span class="nc" id="L63">        entity.setRecommendedProviderCount(dto.getRecommendedProviderCount());</span>
+<span class="nc" id="L64">        entity.setNeurologyReferralNeeded(dto.getNeurologyReferralNeeded());</span>
+<span class="nc" id="L65">        entity.setGeriatricAssessmentNeeded(dto.getGeriatricAssessmentNeeded());</span>
+<span class="nc" id="L66">        entity.setLastAssessmentDate(dto.getLastAssessmentDate());</span>
+<span class="nc" id="L67">        entity.setNextRecommendedAssessmentDate(dto.getNextRecommendedAssessmentDate());</span>
+<span class="nc" id="L68">        entity.setRiskStratum(dto.getRiskStratum());</span>
+<span class="nc" id="L69">        return entity;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

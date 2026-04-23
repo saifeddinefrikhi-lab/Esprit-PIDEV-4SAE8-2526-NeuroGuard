@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssuranceController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">assurance-service</a> &gt; <a href="index.source.html" class="el_package">com.neuroguard.assuranceservice.controller</a> &gt; <span class="el_source">AssuranceController.java</span></div><h1>AssuranceController.java</h1><pre class="source lang-java linenums">package com.neuroguard.assuranceservice.controller;
+
+import com.neuroguard.assuranceservice.dto.AssuranceRequestDto;
+import com.neuroguard.assuranceservice.dto.AssuranceResponseDto;
+import com.neuroguard.assuranceservice.dto.CoverageRiskAssessmentDto;
+import com.neuroguard.assuranceservice.dto.StatisticsDto;
+import com.neuroguard.assuranceservice.entity.AssuranceStatus;
+import com.neuroguard.assuranceservice.entity.CoverageRiskAssessment;
+import com.neuroguard.assuranceservice.service.AssuranceService;
+import com.neuroguard.assuranceservice.service.CoverageRiskAssessmentService;
+import com.neuroguard.assuranceservice.service.StatisticsService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/assurances&quot;)
+@RequiredArgsConstructor
+<span class="nc" id="L24">@Slf4j</span>
+public class AssuranceController {
+
+    private final AssuranceService assuranceService;
+    private final CoverageRiskAssessmentService coverageRiskAssessmentService;
+    private final StatisticsService statisticsService;
+
+    @PostMapping
+    public ResponseEntity&lt;AssuranceResponseDto&gt; createAssurance(@Valid @RequestBody AssuranceRequestDto request) {
+<span class="nc" id="L33">        return new ResponseEntity&lt;&gt;(assuranceService.createAssurance(request), HttpStatus.CREATED);</span>
+    }
+
+    @GetMapping(&quot;/patient/{patientId}&quot;)
+    public ResponseEntity&lt;List&lt;AssuranceResponseDto&gt;&gt; getAssurancesByPatient(@PathVariable Long patientId) {
+<span class="nc" id="L38">        return ResponseEntity.ok(assuranceService.getAssurancesByPatient(patientId));</span>
+    }
+
+    @GetMapping
+    public ResponseEntity&lt;List&lt;AssuranceResponseDto&gt;&gt; getAllAssurances() {
+<span class="nc" id="L43">        return ResponseEntity.ok(assuranceService.getAllAssurances());</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;AssuranceResponseDto&gt; getAssuranceById(@PathVariable Long id) {
+<span class="nc" id="L48">        return ResponseEntity.ok(assuranceService.getAssuranceById(id));</span>
+    }
+
+    @PutMapping(&quot;/{id}/status&quot;)
+    public ResponseEntity&lt;AssuranceResponseDto&gt; updateAssuranceStatus(
+            @PathVariable Long id,
+            @RequestParam AssuranceStatus status) {
+<span class="nc" id="L55">        return ResponseEntity.ok(assuranceService.updateAssuranceStatus(id, status));</span>
+    }
+
+    @PutMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;AssuranceResponseDto&gt; updateAssurance(
+            @PathVariable Long id,
+            @Valid @RequestBody AssuranceRequestDto request) {
+<span class="nc" id="L62">        return ResponseEntity.ok(assuranceService.updateAssurance(id, request));</span>
+    }
+
+    @DeleteMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;Void&gt; deleteAssurance(@PathVariable Long id) {
+<span class="nc" id="L67">        assuranceService.deleteAssurance(id);</span>
+<span class="nc" id="L68">        return ResponseEntity.noContent().build();</span>
+    }
+
+    // ============ Coverage Risk Assessment Endpoints ============
+
+    /**
+     * Generate a comprehensive coverage risk assessment for an assurance record
+     */
+    @PostMapping(&quot;/{assuranceId}/risk-assessment&quot;)
+    public ResponseEntity&lt;CoverageRiskAssessmentDto&gt; generateCoverageAssessment(
+            @PathVariable Long assuranceId,
+            @RequestParam Long patientId) {
+        try {
+<span class="nc" id="L81">            log.debug(&quot;generateCoverageAssessment called - assuranceId: {}, patientId: {}&quot;, assuranceId, patientId);</span>
+<span class="nc" id="L82">            CoverageRiskAssessment assessment = coverageRiskAssessmentService.recalculateRiskAssessment(assuranceId, patientId);</span>
+<span class="nc" id="L83">            log.debug(&quot;Successfully generated assessment, returning to client&quot;);</span>
+<span class="nc" id="L84">            return ResponseEntity.ok(mapToDto(assessment));</span>
+<span class="nc" id="L85">        } catch (Exception e) {</span>
+<span class="nc" id="L86">            log.error(&quot;Exception in generateCoverageAssessment for assuranceId: {}&quot;, assuranceId, e);</span>
+<span class="nc" id="L87">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)</span>
+<span class="nc" id="L88">                    .body(new CoverageRiskAssessmentDto()); // Return empty DTO instead of no body</span>
+        }
+    }
+
+    /**
+     * Retrieve an existing risk assessment
+     */
+    @GetMapping(&quot;/{assuranceId}/risk-assessment&quot;)
+    public ResponseEntity&lt;CoverageRiskAssessmentDto&gt; getRiskAssessment(@PathVariable Long assuranceId) {
+<span class="nc" id="L97">        log.debug(&quot;Fetching risk assessment for assuranceId: {}&quot;, assuranceId);</span>
+<span class="nc" id="L98">        CoverageRiskAssessment assessment = coverageRiskAssessmentService.getAssessmentByAssuranceId(assuranceId);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (assessment == null) {</span>
+<span class="nc" id="L100">            log.debug(&quot;No assessment found for assuranceId: {}&quot;, assuranceId);</span>
+<span class="nc" id="L101">            return ResponseEntity.notFound().build();</span>
+        }
+<span class="nc" id="L103">        log.debug(&quot;Found assessment - assuranceId: {}, patientId: {}, complexityScore: {}, estimatedCost: {}&quot;, </span>
+<span class="nc" id="L104">                 assessment.getAssuranceId(), assessment.getPatientId(), </span>
+<span class="nc" id="L105">                 assessment.getMedicalComplexityScore(), assessment.getEstimatedAnnualClaimCost());</span>
+<span class="nc" id="L106">        return ResponseEntity.ok(mapToDto(assessment));</span>
+    }
+
+    /**
+     * Recalculate/refresh an existing risk assessment
+     */
+    @PutMapping(&quot;/{assuranceId}/risk-assessment/refresh&quot;)
+    public ResponseEntity&lt;CoverageRiskAssessmentDto&gt; refreshRiskAssessment(
+            @PathVariable Long assuranceId,
+            @RequestParam Long patientId) {
+        try {
+<span class="nc" id="L117">            CoverageRiskAssessment assessment = coverageRiskAssessmentService.recalculateRiskAssessment(assuranceId, patientId);</span>
+<span class="nc" id="L118">            return ResponseEntity.ok(mapToDto(assessment));</span>
+<span class="nc" id="L119">        } catch (Exception e) {</span>
+<span class="nc" id="L120">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();</span>
+        }
+    }
+
+    // ============ Advanced Statistics Endpoints ============
+
+    /**
+     * Get comprehensive patient-level statistics
+     */
+    @GetMapping(&quot;/stats/patient/{patientId}&quot;)
+    public ResponseEntity&lt;StatisticsDto.PatientStatistics&gt; getPatientStatistics(
+            @PathVariable Long patientId) {
+        try {
+<span class="nc" id="L133">            StatisticsDto.PatientStatistics stats = statisticsService.getPatientStatistics(patientId);</span>
+<span class="nc" id="L134">            return ResponseEntity.ok(stats);</span>
+<span class="nc" id="L135">        } catch (Exception e) {</span>
+<span class="nc" id="L136">            log.error(&quot;Error getting patient statistics for patientId: {}&quot;, patientId, e);</span>
+<span class="nc" id="L137">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();</span>
+        }
+    }
+
+    /**
+     * Get comprehensive assurance-level statistics
+     */
+    @GetMapping(&quot;/stats/assurance/{assuranceId}&quot;)
+    public ResponseEntity&lt;StatisticsDto.AssuranceStatistics&gt; getAssuranceStatistics(
+            @PathVariable Long assuranceId) {
+        try {
+<span class="nc" id="L148">            StatisticsDto.AssuranceStatistics stats = statisticsService.getAssuranceStatistics(assuranceId);</span>
+<span class="nc" id="L149">            return ResponseEntity.ok(stats);</span>
+<span class="nc" id="L150">        } catch (Exception e) {</span>
+<span class="nc" id="L151">            log.error(&quot;Error getting assurance statistics for assuranceId: {}&quot;, assuranceId, e);</span>
+<span class="nc" id="L152">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();</span>
+        }
+    }
+
+    /**
+     * Map entity to DTO
+     */
+    private CoverageRiskAssessmentDto mapToDto(CoverageRiskAssessment assessment) {
+<span class="nc" id="L160">        CoverageRiskAssessmentDto dto = new CoverageRiskAssessmentDto();</span>
+<span class="nc" id="L161">        dto.setId(assessment.getId());</span>
+<span class="nc" id="L162">        dto.setAssuranceId(assessment.getAssuranceId());</span>
+<span class="nc" id="L163">        dto.setPatientId(assessment.getPatientId());</span>
+<span class="nc" id="L164">        dto.setAlzheimersPredictionScore(assessment.getAlzheimersPredictionScore());</span>
+<span class="nc" id="L165">        dto.setAlzheimersPredictionLevel(assessment.getAlzheimersPredictionLevel());</span>
+<span class="nc" id="L166">        dto.setActiveAlertCount(assessment.getActiveAlertCount());</span>
+<span class="nc" id="L167">        dto.setHighestAlertSeverity(assessment.getHighestAlertSeverity());</span>
+<span class="nc" id="L168">        dto.setAlertSeverityRatio(assessment.getAlertSeverityRatio());</span>
+<span class="nc" id="L169">        dto.setMedicalComplexityScore(assessment.getMedicalComplexityScore());</span>
+<span class="nc" id="L170">        dto.setRecommendedCoverageLevel(assessment.getRecommendedCoverageLevel());</span>
+<span class="nc" id="L171">        dto.setEstimatedAnnualClaimCost(assessment.getEstimatedAnnualClaimCost());</span>
+<span class="nc" id="L172">        dto.setRecommendedProcedures(assessment.getRecommendedProcedures());</span>
+<span class="nc" id="L173">        dto.setRecommendedProviderCount(assessment.getRecommendedProviderCount());</span>
+<span class="nc" id="L174">        dto.setNeurologyReferralNeeded(assessment.getNeurologyReferralNeeded());</span>
+<span class="nc" id="L175">        dto.setGeriatricAssessmentNeeded(assessment.getGeriatricAssessmentNeeded());</span>
+<span class="nc" id="L176">        dto.setLastAssessmentDate(assessment.getLastAssessmentDate());</span>
+<span class="nc" id="L177">        dto.setNextRecommendedAssessmentDate(assessment.getNextRecommendedAssessmentDate());</span>
+<span class="nc" id="L178">        dto.setRiskStratum(assessment.getRiskStratum());</span>
+<span class="nc" id="L179">        dto.setCreatedAt(assessment.getCreatedAt());</span>
+<span class="nc" id="L180">        dto.setUpdatedAt(assessment.getUpdatedAt());</span>
+<span class="nc" id="L181">        return dto;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

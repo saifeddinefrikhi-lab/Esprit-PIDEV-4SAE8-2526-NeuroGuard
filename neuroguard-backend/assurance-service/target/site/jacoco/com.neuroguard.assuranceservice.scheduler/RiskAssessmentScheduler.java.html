@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RiskAssessmentScheduler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">assurance-service</a> &gt; <a href="index.source.html" class="el_package">com.neuroguard.assuranceservice.scheduler</a> &gt; <span class="el_source">RiskAssessmentScheduler.java</span></div><h1>RiskAssessmentScheduler.java</h1><pre class="source lang-java linenums">package com.neuroguard.assuranceservice.scheduler;
+
+import com.neuroguard.assuranceservice.entity.Assurance;
+import com.neuroguard.assuranceservice.repository.AssuranceRepository;
+import com.neuroguard.assuranceservice.service.CoverageRiskAssessmentService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Component
+@RequiredArgsConstructor
+<span class="nc" id="L15">@Slf4j</span>
+public class RiskAssessmentScheduler {
+
+    private final AssuranceRepository assuranceRepository;
+    private final CoverageRiskAssessmentService coverageRiskAssessmentService;
+
+    /**
+     * Automatically recalculate risk assessments for assurances
+     * scheduled to be reassessed based on their next assessment date
+     * 
+     * Runs daily at 2 AM
+     */
+    @Scheduled(cron = &quot;0 0 2 * * *&quot;)
+    public void recalculateDueAssessments() {
+<span class="nc" id="L29">        log.info(&quot;Starting scheduled risk assessment recalculation...&quot;);</span>
+
+        try {
+<span class="nc" id="L32">            LocalDateTime now = LocalDateTime.now();</span>
+<span class="nc" id="L33">            List&lt;Assurance&gt; allAssurances = assuranceRepository.findAll();</span>
+
+<span class="nc" id="L35">            int recalculatedCount = 0;</span>
+
+<span class="nc bnc" id="L37" title="All 2 branches missed.">            for (Assurance assurance : allAssurances) {</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">                if (assurance.getCoverageRiskAssessment() != null) {</span>
+<span class="nc" id="L39">                    LocalDateTime nextAssessmentDate = assurance.getCoverageRiskAssessment().getNextRecommendedAssessmentDate();</span>
+
+<span class="nc bnc" id="L41" title="All 4 branches missed.">                    if (nextAssessmentDate != null &amp;&amp; now.isAfter(nextAssessmentDate)) {</span>
+<span class="nc" id="L42">                        log.debug(&quot;Recalculating assessment for assurance ID: {}&quot;, assurance.getId());</span>
+
+                        try {
+<span class="nc" id="L45">                            coverageRiskAssessmentService.recalculateRiskAssessment(</span>
+<span class="nc" id="L46">                                    assurance.getId(),</span>
+<span class="nc" id="L47">                                    assurance.getPatientId()</span>
+                            );
+<span class="nc" id="L49">                            recalculatedCount++;</span>
+<span class="nc" id="L50">                        } catch (Exception e) {</span>
+<span class="nc" id="L51">                            log.error(&quot;Error recalculating assessment for assurance ID: {}&quot;, assurance.getId(), e);</span>
+<span class="nc" id="L52">                        }</span>
+                    }
+                }
+<span class="nc" id="L55">            }</span>
+
+<span class="nc" id="L57">            log.info(&quot;Completed scheduled risk assessment recalculation. Updated {} assessments.&quot;, recalculatedCount);</span>
+
+<span class="nc" id="L59">        } catch (Exception e) {</span>
+<span class="nc" id="L60">            log.error(&quot;Error in scheduled risk assessment recalculation&quot;, e);</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Monitor high-risk assessments and generate alerts
+     * Runs every 6 hours
+     */
+    @Scheduled(cron = &quot;0 0 */6 * * *&quot;)
+    public void monitorHighRiskAssessments() {
+<span class="nc" id="L70">        log.info(&quot;Starting high-risk assessment monitoring...&quot;);</span>
+
+        try {
+<span class="nc" id="L73">            List&lt;Assurance&gt; allAssurances = assuranceRepository.findAll();</span>
+
+<span class="nc" id="L75">            int criticalCount = 0;</span>
+<span class="nc" id="L76">            int highCount = 0;</span>
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            for (Assurance assurance : allAssurances) {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                if (assurance.getCoverageRiskAssessment() != null) {</span>
+<span class="nc" id="L80">                    Integer complexityScore = assurance.getCoverageRiskAssessment().getMedicalComplexityScore();</span>
+
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                    if (complexityScore &gt;= 85) {</span>
+<span class="nc" id="L83">                        criticalCount++;</span>
+<span class="nc" id="L84">                        log.warn(&quot;CRITICAL RISK: Assurance ID {} has complexity score {}&quot;, assurance.getId(), complexityScore);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                    } else if (complexityScore &gt;= 65) {</span>
+<span class="nc" id="L86">                        highCount++;</span>
+<span class="nc" id="L87">                        log.info(&quot;HIGH RISK: Assurance ID {} has complexity score {}&quot;, assurance.getId(), complexityScore);</span>
+                    }
+                }
+<span class="nc" id="L90">            }</span>
+
+<span class="nc" id="L92">            log.info(&quot;Risk monitoring complete. Critical: {}, High: {}&quot;, criticalCount, highCount);</span>
+
+<span class="nc" id="L94">        } catch (Exception e) {</span>
+<span class="nc" id="L95">            log.error(&quot;Error in high-risk assessment monitoring&quot;, e);</span>
+<span class="nc" id="L96">        }</span>
+<span class="nc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
