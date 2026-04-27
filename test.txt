@@ -1,0 +1,77 @@
+================================================================================
+          NEUROGUARD SYSTEM - COMPREHENSIVE TESTING DOCUMENTATION
+================================================================================
+
+This document provides a detailed explanation of the automated testing suite 
+implemented across the NeuroGuard microservices and the Angular frontend.
+
+--------------------------------------------------------------------------------
+1. ARCHITECTURAL OVERVIEW
+--------------------------------------------------------------------------------
+The project follows a "Pyramid Testing" strategy:
+- Unit Tests: Focus on isolated business logic (Service Layer).
+- Integration Tests: Focus on API endpoints and Database interactions.
+- Frontend Component Tests: Focus on UI behavior and data rendering.
+
+--------------------------------------------------------------------------------
+2. BACKEND TESTING (JAVA / SPRING BOOT)
+--------------------------------------------------------------------------------
+We use JUnit 5 as the testing runner and Mockito for dependency isolation.
+
+A. NUTRITION SERVICE TESTS (Unit)
+File: monitoring-service/src/test/java/.../service/NutritionServiceTest.java
+- Goal: Verify the mathematical accuracy of the automatic macro-calculator.
+- Key Test Cases:
+  * testAddMeal_ShouldCalculateTotalsCorrectly: Verifies that adding a meal 
+    automatically updates daily calories and applies the 25/50/25 macro split.
+  * testDeleteMeal_ShouldRecalculateTotals: Ensures that removing a meal 
+    correctly subtracts calories and resets macros without "ghost" data drift.
+  * testGetDailyNutrition_WhenNotFound_ShouldCreateNew: Verifies the safe-seed 
+    mechanism that initializes a daily log if one doesn't exist.
+
+B. NUTRITION CONTROLLER TESTS (Integration)
+File: monitoring-service/src/test/java/.../controller/NutritionControllerIntegrationTest.java
+- Goal: Verify the REST API layer and JSON serialization.
+- Key Test Cases:
+  * testGetDailyNutrition_Success: Uses MockMvc to perform a real HTTP GET 
+    request and asserts that the response contains the correct JSON structure.
+  * testAddMeal_Endpoint: Verifies that the @PostMapping correctly receives a 
+    MealDTO and returns a 201 Created status.
+
+C. COGNITIVE SCORE SERVICE TESTS (Unit)
+File: wellbeing-service/src/test/java/.../service/CognitiveScoreServiceTest.java
+- Goal: Verify the logic for tracking patient game performance.
+- Key Test Cases:
+  * testSaveResult_ShouldCallRepositorySave: Ensures game scores are persisted.
+  * testGetPatientResultsByGame_ShouldFilterCorrectly: Verifies that the 
+    service can distinguish between 'Memory Match' scores and 'Word Recall'.
+
+--------------------------------------------------------------------------------
+3. FRONTEND TESTING (ANGULAR / KARMA / JASMINE)
+--------------------------------------------------------------------------------
+The frontend uses the Jasmine framework to verify component integrity.
+
+A. NUTRITION SUMMARY COMPONENT
+File: FrontEnd/src/app/features/monitoring/components/nutrition-summary/nutrition-summary.component.spec.ts
+- Goal: Ensure the dashboard correctly visualizes backend data.
+- Key Test Cases:
+  * should create: Verifies the component initializes without errors.
+  * should display correct progress bar %: Mocks a nutrition DTO and asserts 
+    that the DOM reflects the correct percentage of target calories consumed.
+
+B. MONITORING PULSE COMPONENT
+File: FrontEnd/src/app/features/monitoring/components/monitoring-pulse/monitoring-pulse.component.spec.ts
+- Goal: Verify real-time status visualization.
+- Key Test Cases:
+  * should show warning icon on severe status: Injects an 'interpreted' vital 
+    reading with status 'warning' and checks if the CSS class 'urgent' is applied.
+
+--------------------------------------------------------------------------------
+4. HOW TO RUN THE TESTS
+--------------------------------------------------------------------------------
+- Backend: Run `./mvnw test` in each service directory.
+- Frontend: Run `npm test` in the FrontEnd directory.
+
+================================================================================
+Documentation generated for Professor Validation - NeuroGuard Project (2026)
+================================================================================
