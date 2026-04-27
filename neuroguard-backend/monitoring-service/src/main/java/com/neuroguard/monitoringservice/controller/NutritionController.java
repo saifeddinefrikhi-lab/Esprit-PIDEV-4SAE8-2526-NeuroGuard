@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
-@CrossOrigin(origins = "http://localhost:4200")
+
 @RestController
 // CRITICAL FIX: context-path in application.properties is already "/api/monitoring",
 // so this mapping must be ONLY "/nutrition" — not the full path.

@@ -150,6 +150,14 @@ spring:
           uri: lb://reservation-service
           predicates:
             - Path=/api/reservations/**
+        - id: monitoring-service
+          uri: lb://monitoring-service
+          predicates:
+            - Path=/api/monitoring/**
+        - id: wellbeing-service
+          uri: lb://wellbeing-service
+          predicates:
+            - Path=/api/wellbeing/**
 
 
 logging:

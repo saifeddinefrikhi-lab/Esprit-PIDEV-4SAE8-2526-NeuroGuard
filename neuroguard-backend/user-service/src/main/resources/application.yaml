@@ -41,6 +41,9 @@ eureka:
       defaultZone: http://localhost:8761/eureka  # URL of your Eureka server
     register-with-eureka: true
     fetch-registry: true
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
 
 server:
   port: 8081  # Port on which the microservice will run

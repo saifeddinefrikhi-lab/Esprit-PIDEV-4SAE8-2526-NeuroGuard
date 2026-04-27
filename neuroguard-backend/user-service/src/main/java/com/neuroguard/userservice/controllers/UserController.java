@@ -147,6 +147,13 @@ public class UserController {
         }
     }
 
+    @GetMapping("/caregiver/{caregiverId}/patients")
+    public ResponseEntity<List<UserDto>> getPatientsByCaregiverId(@PathVariable Long caregiverId) {
+        List<User> patients = userRepository.findByCaregiverId(caregiverId);
+        List<UserDto> dtos = patients.stream().map(this::convertToDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
     // Helper method to convert User to UserDto (reuse existing mapping logic)
     private UserDto convertToDto(User user) {
         UserDto dto = new UserDto();

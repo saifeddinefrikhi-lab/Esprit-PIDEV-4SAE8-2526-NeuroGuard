@@ -10,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/wellbeing/cognitive-games")
-@CrossOrigin(origins = "http://localhost:4200")
+
 public class CognitiveScoreController {
 
     @Autowired

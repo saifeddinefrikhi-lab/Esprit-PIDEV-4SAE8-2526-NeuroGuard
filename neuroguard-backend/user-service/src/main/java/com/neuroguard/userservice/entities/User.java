@@ -45,6 +45,12 @@ public class User {
     @Column(nullable = false)
     private UserStatus status = UserStatus.ACTIVE;
 
+    @Column(name = "caregiver_id")
+    private Long caregiverId;
+
+    @Column(name = "doctor_id")
+    private Long doctorId;
+
     /**
      * Incremented whenever a user is banned/disabled,
      * effectively invalidating all older JWT tokens.
