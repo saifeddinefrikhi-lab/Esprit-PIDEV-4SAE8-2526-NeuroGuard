@@ -67,6 +67,14 @@ export const NavigationItems: NavigationItem[] = [
         classes: 'nav-item',
         icon: 'medicine-box', // Ant Design medicine-box icon
       },
+      {
+        id: 'patient-monitoring',
+        title: 'Patient Monitoring',
+        type: 'item',
+        url: '/provider/monitoring',
+        classes: 'nav-item',
+        icon: 'activity',
+      },
     ]
   },
   {
@@ -108,7 +116,7 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'schedule', // Ant Design schedule icon
       },
       {
-        id: 'consultation-history', 
+        id: 'consultation-history',
         title: 'Consultation History',
         type: 'item',
         url: '/provider/consultations/history', // Path to view consultation history
@@ -165,7 +173,7 @@ export const NavigationItems: NavigationItem[] = [
       },
     ]
   },
-  
-  
+
+
 ];
 

@@ -6,7 +6,11 @@ import packageInfo from '../../package.json';
 
 export const environment = {
   appVersion: packageInfo.version,
-  production: false
+  production: false,
+  authApi: 'http://localhost:8081/auth',
+  wellbeingApi: 'http://localhost:8084/api/wellbeing',
+  monitoringApi: 'http://localhost:8085/api/monitoring',
+  usersApi: 'http://localhost:8081/users'
 };
 
 /*

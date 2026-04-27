@@ -75,6 +75,14 @@ export const NavigationItems: NavigationItem[] = [
         url: '/caregiver/alerts', // Path to manage alerts for caregivers
         icon: 'bell', // Ant Design bell icon
       },
+      {
+        id: 'monitoring',
+        title: 'Patient Monitoring',
+        type: 'item',
+        url: '/caregiver/monitoring',
+        classes: 'nav-item',
+        icon: 'activity',
+      },
     ]
   },
   {
@@ -88,8 +96,8 @@ export const NavigationItems: NavigationItem[] = [
         title: 'Patient Well-being',
         type: 'item',
         classes: 'nav-item',
-        url: '/caregiver/well-being', // Path to monitor patient well-being
-        icon: 'book', // Ant Design smile icon
+        url: '/caregiver/wellbeing', // Path to monitor patient well-being
+        icon: 'heart', // Ant Design heart icon
       },
     ]
   },

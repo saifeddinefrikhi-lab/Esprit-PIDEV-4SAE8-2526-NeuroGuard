@@ -149,6 +149,37 @@ export const NavigationItems: NavigationItem[] = [
       },
     ]
   },
-  
+  {
+    id: 'wellbeing',
+    title: 'Wellbeing Management',
+    type: 'group',
+    icon: 'heart',
+    children: [
+      {
+        id: 'wellbeing-dashboard',
+        title: 'Wellbeing Dashboard',
+        type: 'item',
+        url: '/admin/wellbeing',
+        classes: 'nav-item',
+        icon: 'heart',
+      }
+    ]
+  },
+  {
+    id: 'monitoring',
+    title: 'Patient Monitoring',
+    type: 'group',
+    icon: 'activity',
+    children: [
+      {
+        id: 'monitoring-dashboard',
+        title: 'Monitoring Dashboard',
+        type: 'item',
+        url: '/admin/monitoring',
+        classes: 'nav-item',
+        icon: 'activity',
+      }
+    ]
+  },
 ];
 

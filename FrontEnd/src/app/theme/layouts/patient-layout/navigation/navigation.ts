@@ -92,7 +92,7 @@ export const NavigationItems: NavigationItem[] = [
         id: 'wellness',
         title: 'Wellness Tracking',
         type: 'item',
-        url: '/patient/wellness',
+        url: '/patient/wellbeing',
         icon: 'heart',
         breadcrumbs: false
       },

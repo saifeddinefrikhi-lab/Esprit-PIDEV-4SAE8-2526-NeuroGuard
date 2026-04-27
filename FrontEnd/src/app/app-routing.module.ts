@@ -8,6 +8,7 @@ import { GuestLayoutComponent } from './theme/layouts/guest-layout/guest-layout.
 import { PatientLayout } from './theme/layouts/patient-layout/patient-layout.component';
 import { CaregiverLayout } from './theme/layouts/caregiver-layout/caregiver-layout.component';
 import { ProviderLayout } from './theme/layouts/provider-layout/provider-layout.component';
+import { RoleGuard } from './core/guards/role.guard';
 
 const routes: Routes = [
   {
@@ -18,6 +19,8 @@ const routes: Routes = [
   {
     path: '',
     component: AdminLayout,
+    canActivate: [RoleGuard],
+    data: { role: 'admin' },
     children: [
       {
         path: 'admin/dashboard',
@@ -35,17 +38,31 @@ const routes: Routes = [
         path: 'admin/patients',
         loadComponent: () => import('./Back-office/pages/patient-management/patient-management').then((c) => c.PatientManagement)
       },
+      {
+        path: 'admin/wellbeing',
+        loadChildren: () => import('./features/wellbeing/wellbeing.module').then((m) => m.WellbeingModule)
+      },
+      {
+        path: 'admin/monitoring',
+        loadChildren: () => import('./features/monitoring/monitoring.module').then((m) => m.MonitoringModule)
+      },
     ]
   },
 
-  { 
-    
+  {
+
     path: '',
     component: PatientLayout,
+    canActivate: [RoleGuard],
+    data: { role: 'patient' },
     children: [
       {
         path: 'patient/home',
         loadComponent: () => import('./Front-office/patient/home/home.component').then((c) => c.HomeComponent)
+      },
+      {
+        path: 'patient/wellbeing',
+        loadChildren: () => import('./features/wellbeing/wellbeing.module').then((m) => m.WellbeingModule)
       },
     ]
   },
@@ -53,10 +70,20 @@ const routes: Routes = [
   {
     path: '',
     component: CaregiverLayout,
+    canActivate: [RoleGuard],
+    data: { role: 'caregiver' },
     children: [
       {
         path: 'caregiver/home',
         loadComponent: () => import('./Front-office/caregiver/home/home.component').then((c) => c.HomeComponent)
+      },
+      {
+        path: 'caregiver/wellbeing',
+        loadChildren: () => import('./features/wellbeing/wellbeing.module').then((m) => m.WellbeingModule)
+      },
+      {
+        path: 'caregiver/monitoring',
+        loadChildren: () => import('./features/monitoring/monitoring.module').then((m) => m.MonitoringModule)
       },
     ]
   },
@@ -64,10 +91,16 @@ const routes: Routes = [
   {
     path: '',
     component: ProviderLayout,
+    canActivate: [RoleGuard],
+    data: { role: 'provider' },
     children: [
       {
         path: 'provider/home',
         loadComponent: () => import('./Front-office/healthcare-provider/home/home.component').then((c) => c.HomeComponent)
+      },
+      {
+        path: 'provider/monitoring',
+        loadChildren: () => import('./features/monitoring/monitoring.module').then((m) => m.MonitoringModule)
       },
     ]
   },
@@ -97,4 +130,4 @@ const routes: Routes = [
   imports: [RouterModule.forRoot(routes)],
   exports: [RouterModule]
 })
-export class AppRoutingModule {}
+export class AppRoutingModule { }

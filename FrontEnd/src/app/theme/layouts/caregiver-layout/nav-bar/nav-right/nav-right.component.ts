@@ -4,6 +4,7 @@ import { RouterModule, Router } from '@angular/router';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
+import { AuthService } from 'src/app/core/services/auth.service';
 
 // third party
 
@@ -37,7 +38,8 @@ import {
 })
 export class NavRightComponent {
   private iconService = inject(IconService);
-  private router = inject(Router);  // Injecting the Router service
+  private router = inject(Router);
+  public authService = inject(AuthService);
 
 
   // public props
@@ -123,8 +125,7 @@ export class NavRightComponent {
   ];
 
   logout() {
-    // Perform any necessary logout actions (e.g., clearing session storage, token, etc.)
-    // Navigate to the login page
+    this.authService.logout();
     this.router.navigate(['/login']);
   }
 }
