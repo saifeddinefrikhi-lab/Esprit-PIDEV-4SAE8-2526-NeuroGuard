@@ -3,31 +3,46 @@ package com.neuroguard.userservice.services;
 import com.neuroguard.userservice.dto.CreateUserRequest;
 import com.neuroguard.userservice.dto.UpdateUserRequest;
 import com.neuroguard.userservice.dto.UserDto;
+import com.neuroguard.userservice.dto.UserStatsDto;
 import com.neuroguard.userservice.entities.Role;
+import com.neuroguard.userservice.entities.UserStatus;
 import com.neuroguard.userservice.entities.User;
 import com.neuroguard.userservice.security.JwtUtils;
+import com.neuroguard.userservice.repositories.PasswordResetTokenRepository;
 import com.neuroguard.userservice.repositories.UserRepository;
+import com.neuroguard.userservice.events.UserCreatedEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class UserService implements UserDetailsService {
 
     @Autowired
     private UserRepository userRepository;
 
     @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
     private JwtUtils jwtUtils;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     // Register a new user
     public String registerUser(User user) {
@@ -37,17 +52,46 @@ public class UserService implements UserDetailsService {
         if (userRepository.existsByUsername(user.getUsername())) {
             return "Username already exists!";
         }
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (user.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
+        }
         userRepository.save(user);
         return "User registered successfully!";
     }
 
+    // Register a new user from Google Login (handles password null)
+    public User registerGoogleUser(User user) {
+        if (userRepository.existsByEmail(user.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+        user.setPassword(null); // Explicitly ensure no password
+        return userRepository.save(user);
+    }
+
     public String loginUser(String username, String password) {
         User user = userRepository.findByUsername(username).orElse(null);
-        if (user != null && passwordEncoder.matches(password, user.getPassword())) {
-            return jwtUtils.generateJwtToken(user.getUsername(), user.getRole().name(), user.getId());
+        if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
+            return null;
         }
-        return null;
+        
+        // Handle temporary ban expiration
+        if (user.getStatus() == UserStatus.BANNED && user.getBannedUntil() != null) {
+            if (user.getBannedUntil().isBefore(java.time.LocalDateTime.now())) {
+                log.info("Ban expired for user {}, auto-reactivating", user.getUsername());
+                user.setStatus(UserStatus.ACTIVE);
+                user.setBannedUntil(null);
+                user.setTokenVersion(user.getTokenVersion() + 1);
+                userRepository.save(user);
+            }
+        }
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new RuntimeException("BANNED");
+        }
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new RuntimeException("DISABLED");
+        }
+        return jwtUtils.generateJwtToken(user.getUsername(), user.getRole().name(), user.getId(), user.getTokenVersion());
     }
 
     @Override
@@ -62,6 +106,20 @@ public class UserService implements UserDetailsService {
                 .password(user.getPassword())
                 .roles(String.valueOf(user.getRole()))
                 .build();
+    }
+
+    public void updateLastSeen(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            user.setLastSeen(java.time.LocalDateTime.now());
+            userRepository.save(user);
+        });
+    }
+
+    public void clearLastSeen(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            user.setLastSeen(null);
+            userRepository.save(user);
+        });
     }
 
     // In UserService.java
@@ -91,7 +149,12 @@ public class UserService implements UserDetailsService {
         user.setAge(request.getAge());
         user.setRole(Role.valueOf(request.getRole().toUpperCase()));
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        User saved = userRepository.save(user);
+        log.info("Creating new user via Admin: {}", request.getEmail());
+        User saved = userRepository.saveAndFlush(user);
+        
+        // Trigger invitation flow via event (Decoupled to fix circular dependencies)
+        eventPublisher.publishEvent(new UserCreatedEvent(this, saved.getEmail()));
+        
         return convertToDto(saved);
     }
 
@@ -123,55 +186,41 @@ public class UserService implements UserDetailsService {
         return convertToDto(updated);
     }
 
+    @Transactional
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("User not found");
-        }
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // 1. Explicitly delete all dependencies (tokens)
+        passwordResetTokenRepository.deleteAllTokensByUser(user);
+        
+        // 2. Delete the user
+        userRepository.delete(user);
     }
 
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<UserDto> getPatientsByCaregiver(Long caregiverId) {
-        return userRepository.findByCaregiverIdAndRole(caregiverId, Role.PATIENT)
-                .stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-    }
-
-    public UserDto assignCaregiverToPatient(Long patientId, Long caregiverId) {
-        User patient = userRepository.findById(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
-        User caregiver = userRepository.findById(caregiverId)
-                .orElseThrow(() -> new RuntimeException("Caregiver not found"));
-
-        if (patient.getRole() != Role.PATIENT) {
-            throw new RuntimeException("User is not a patient");
-        }
-        if (caregiver.getRole() != Role.CAREGIVER) {
-            throw new RuntimeException("User is not a caregiver");
+    /**
+     * Update the account status of a user (ACTIVE, BANNED, DISABLED).
+     * Bumping tokenVersion immediately invalidates all existing JWTs.
+     */
+    @Transactional
+    public UserDto updateUserStatus(Long id, UserStatus newStatus, Integer durationHours) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        
+        user.setStatus(newStatus);
+        
+        if (newStatus == UserStatus.BANNED && durationHours != null && durationHours > 0) {
+            user.setBannedUntil(java.time.LocalDateTime.now().plusHours(durationHours));
+            log.info("User {} banned for {} hours", user.getUsername(), durationHours);
+        } else if (newStatus == UserStatus.ACTIVE || newStatus == UserStatus.DISABLED) {
+            user.setBannedUntil(null);
         }
 
-        patient.setCaregiver(caregiver);
-        User updated = userRepository.save(patient);
-        return convertToDto(updated);
-    }
-
-    public UserDto assignDoctorToPatient(Long patientId, Long doctorId) {
-        User patient = userRepository.findById(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
-        User doctor = userRepository.findById(doctorId)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
-
-        if (patient.getRole() != Role.PATIENT) {
-            throw new RuntimeException("User is not a patient");
-        }
-        if (doctor.getRole() != Role.PROVIDER) {
-            throw new RuntimeException("User is not a provider/doctor");
-        }
-
-        patient.setDoctor(doctor);
-        User updated = userRepository.save(patient);
-        return convertToDto(updated);
+        // Incrementing tokenVersion invalidates ALL currently issued JWTs for this user
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        User saved = userRepository.save(user);
+        log.info("User {} status changed to {} by admin", user.getUsername(), newStatus);
+        return convertToDto(saved);
     }
 
     // Helper conversion (already exists in UserController, can be moved to service)
@@ -182,37 +231,40 @@ public class UserService implements UserDetailsService {
         dto.setEmail(user.getEmail());
         dto.setFirstName(user.getFirstName());
         dto.setLastName(user.getLastName());
-        dto.setName(user.getFirstName() + " " + user.getLastName());
-        if (user.getRole() != null) {
-            dto.setRole(user.getRole().name());
+        
+        // Defensive mapping for role and status
+        dto.setRole(user.getRole() != null ? user.getRole().name() : "PATIENT");
+        dto.setStatus(user.getStatus() != null ? user.getStatus().name() : "ACTIVE");
+        dto.setBannedUntil(user.getBannedUntil());
+        
+        // Check if user has been active in the last 15 minutes
+        if (user.getLastSeen() != null) {
+            java.time.LocalDateTime fifteenMinutesAgo = java.time.LocalDateTime.now().minusMinutes(15);
+            dto.setConnected(user.getLastSeen().isAfter(fifteenMinutesAgo));
+        } else {
+            dto.setConnected(false);
         }
-
-        if (user.getCaregiver() != null) {
-            dto.setCaregiverId(user.getCaregiver().getId());
-        }
-        if (user.getDoctor() != null) {
-            dto.setDoctorId(user.getDoctor().getId());
-            dto.setDoctorEmail(user.getDoctor().getEmail());
-        }
-
-        if (user.getRole() == Role.CAREGIVER && user.getPatients() != null) {
-            List<UserDto> patientDtos = user.getPatients().stream().map(p -> {
-                UserDto pDto = new UserDto();
-                pDto.setId(p.getId());
-                pDto.setUsername(p.getUsername());
-                pDto.setEmail(p.getEmail());
-                pDto.setFirstName(p.getFirstName());
-                pDto.setLastName(p.getLastName());
-                pDto.setName(p.getFirstName() + " " + p.getLastName());
-                if (p.getRole() != null) {
-                    pDto.setRole(p.getRole().name());
-                }
-                pDto.setCaregiverId(user.getId());
-                return pDto;
-            }).collect(Collectors.toList());
-            dto.setPatients(patientDtos);
-        }
-
+        
         return dto;
+    }
+
+    public UserStatsDto getStats() {
+        long patients = userRepository.countByRole(Role.PATIENT);
+        long providers = userRepository.countByRole(Role.PROVIDER);
+        long caregivers = userRepository.countByRole(Role.CAREGIVER);
+        long admins = userRepository.countByRole(Role.ADMIN);
+        long total = userRepository.count();
+        return new UserStatsDto(total, patients, providers, caregivers, admins);
+    }
+
+    // Find user by email (for password reset)
+    public Optional<User> findUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
+    // Update user password (for password reset)
+    public void updateUserPassword(User user, String newPassword) {
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 }

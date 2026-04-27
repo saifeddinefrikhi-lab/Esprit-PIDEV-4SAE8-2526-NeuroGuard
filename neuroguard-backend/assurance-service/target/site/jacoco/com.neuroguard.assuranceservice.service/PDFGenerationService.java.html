@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PDFGenerationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">assurance-service</a> &gt; <a href="index.source.html" class="el_package">com.neuroguard.assuranceservice.service</a> &gt; <span class="el_source">PDFGenerationService.java</span></div><h1>PDFGenerationService.java</h1><pre class="source lang-java linenums">package com.neuroguard.assuranceservice.service;
+
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfWriter;
+import com.neuroguard.assuranceservice.dto.AssuranceResponseDto;
+import com.neuroguard.assuranceservice.dto.UserDto;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import java.io.ByteArrayOutputStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+<span class="nc" id="L23">@Slf4j</span>
+<span class="nc" id="L24">public class PDFGenerationService {</span>
+
+    @Autowired(required = false)
+    private TemplateEngine templateEngine;
+
+<span class="nc" id="L29">    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm:ss&quot;);</span>
+
+    /**
+     * Generate PDF for a single assurance record
+     */
+    public byte[] generateAssurancePDF(AssuranceResponseDto assurance, UserDto user) {
+        try {
+<span class="nc" id="L36">            log.info(&quot;Generating PDF for assurance ID: {}&quot;, assurance.getId());</span>
+
+            // Create HTML content from template
+<span class="nc" id="L39">            String htmlContent = renderTemplate(assurance, user);</span>
+
+            // Convert HTML to PDF
+<span class="nc" id="L42">            return convertHtmlToPdf(htmlContent);</span>
+
+<span class="nc" id="L44">        } catch (Exception e) {</span>
+<span class="nc" id="L45">            log.error(&quot;Error generating PDF for assurance {}: {}&quot;, assurance.getId(), e.getMessage(), e);</span>
+<span class="nc" id="L46">            throw new RuntimeException(&quot;PDF generation failed for assurance &quot; + assurance.getId(), e);</span>
+        }
+    }
+
+    /**
+     * Generate PDF for multiple assurance records (bulk export)
+     */
+    public byte[] generateBulkAssurancePDF(List&lt;AssuranceResponseDto&gt; assurances, UserDto user) {
+        try {
+<span class="nc" id="L55">            log.info(&quot;Generating bulk PDF export for {} assurance(s)&quot;, assurances.size());</span>
+
+<span class="nc" id="L57">            ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L58">            Document document = new Document();</span>
+<span class="nc" id="L59">            PdfWriter.getInstance(document, baos);</span>
+<span class="nc" id="L60">            document.open();</span>
+
+            // Add title
+<span class="nc" id="L63">            Paragraph title = new Paragraph(&quot;NeuroGuard Insurance Report - Bulk Export&quot;);</span>
+<span class="nc" id="L64">            title.setAlignment(Paragraph.ALIGN_CENTER);</span>
+<span class="nc" id="L65">            document.add(title);</span>
+
+            // Add timestamp
+<span class="nc" id="L68">            Paragraph timestamp = new Paragraph(&quot;Generated: &quot; + LocalDateTime.now().format(formatter));</span>
+<span class="nc" id="L69">            timestamp.setAlignment(Paragraph.ALIGN_CENTER);</span>
+<span class="nc" id="L70">            document.add(timestamp);</span>
+
+            // Add each assurance
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            for (int i = 0; i &lt; assurances.size(); i++) {</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L75">                    document.newPage(); // New page for each assurance</span>
+                }
+
+<span class="nc" id="L78">                String htmlContent = renderTemplate(assurances.get(i), user);</span>
+                // For simplicity, just add the HTML as text
+<span class="nc" id="L80">                document.add(new Paragraph(htmlContent));</span>
+            }
+
+<span class="nc" id="L83">            document.close();</span>
+
+<span class="nc" id="L85">            log.info(&quot;✓ Bulk PDF generated successfully - {} pages&quot;, assurances.size());</span>
+<span class="nc" id="L86">            return baos.toByteArray();</span>
+
+<span class="nc" id="L88">        } catch (Exception e) {</span>
+<span class="nc" id="L89">            log.error(&quot;Error generating bulk PDF: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L90">            throw new RuntimeException(&quot;Bulk PDF generation failed&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Render HTML template for PDF
+     */
+    private String renderTemplate(AssuranceResponseDto assurance, UserDto user) {
+        // Simple HTML generation if template engine not available
+<span class="nc" id="L99">        StringBuilder html = new StringBuilder();</span>
+<span class="nc" id="L100">        html.append(&quot;&lt;html&gt;&lt;body style='font-family: Arial, sans-serif; margin: 40px;'&gt;&quot;);</span>
+<span class="nc" id="L101">        html.append(&quot;&lt;div style='border-bottom: 3px solid #667eea; padding-bottom: 20px; margin-bottom: 30px;'&gt;&quot;);</span>
+<span class="nc" id="L102">        html.append(&quot;&lt;h1 style='color: #667eea; margin: 0;'&gt;Insurance Policy Report&lt;/h1&gt;&quot;);</span>
+<span class="nc" id="L103">        html.append(&quot;&lt;p style='color: #999; margin: 10px 0 0 0;'&gt;Generated: &quot;).append(LocalDateTime.now().format(formatter)).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L104">        html.append(&quot;&lt;/div&gt;&quot;);</span>
+
+        // Patient Information
+<span class="nc" id="L107">        html.append(&quot;&lt;div style='margin: 20px 0;'&gt;&quot;);</span>
+<span class="nc" id="L108">        html.append(&quot;&lt;h2 style='color: #2c3e50; font-size: 14px; margin-bottom: 10px;'&gt;PATIENT INFORMATION&lt;/h2&gt;&quot;);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (user != null) {</span>
+<span class="nc" id="L110">            html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Name:&lt;/strong&gt; &quot;).append(user.getFirstName()).append(&quot; &quot;).append(user.getLastName()).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L111">            html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Email:&lt;/strong&gt; &quot;).append(user.getEmail()).append(&quot;&lt;/p&gt;&quot;);</span>
+        }
+<span class="nc" id="L113">        html.append(&quot;&lt;/div&gt;&quot;);</span>
+
+        // Insurance Details
+<span class="nc" id="L116">        html.append(&quot;&lt;div style='margin: 20px 0;'&gt;&quot;);</span>
+<span class="nc" id="L117">        html.append(&quot;&lt;h2 style='color: #2c3e50; font-size: 14px; margin-bottom: 10px;'&gt;INSURANCE DETAILS&lt;/h2&gt;&quot;);</span>
+<span class="nc" id="L118">        html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Provider:&lt;/strong&gt; &quot;).append(assurance.getProviderName()).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L119">        html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Policy Number:&lt;/strong&gt; &lt;code style='background: #f0f4f8; padding: 2px 6px; color: #0ea5e9;'&gt;&quot;)</span>
+<span class="nc" id="L120">                .append(assurance.getPolicyNumber()).append(&quot;&lt;/code&gt;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L121">        html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Illness/Condition:&lt;/strong&gt; &quot;).append(assurance.getIllness()).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L122">        html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Postal Code:&lt;/strong&gt; &quot;).append(assurance.getPostalCode()).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L123">        html.append(&quot;&lt;p style='margin: 5px 0;'&gt;&lt;strong&gt;Mobile Phone:&lt;/strong&gt; &quot;).append(assurance.getMobilePhone()).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L124">        html.append(&quot;&lt;/div&gt;&quot;);</span>
+
+        // Status
+<span class="nc" id="L127">        html.append(&quot;&lt;div style='margin: 20px 0;'&gt;&quot;);</span>
+<span class="nc" id="L128">        html.append(&quot;&lt;h2 style='color: #2c3e50; font-size: 14px; margin-bottom: 10px;'&gt;STATUS&lt;/h2&gt;&quot;);</span>
+<span class="nc" id="L129">        String statusColor = getStatusColor(assurance.getStatus().toString());</span>
+<span class="nc" id="L130">        html.append(&quot;&lt;span style='background: &quot;).append(statusColor).append(&quot;; color: white; padding: 5px 10px; border-radius: 20px; font-weight: bold;'&gt;&quot;)</span>
+<span class="nc" id="L131">                .append(assurance.getStatus().toString()).append(&quot;&lt;/span&gt;&quot;);</span>
+<span class="nc" id="L132">        html.append(&quot;&lt;/div&gt;&quot;);</span>
+
+        // Dates
+<span class="nc" id="L135">        html.append(&quot;&lt;div style='margin: 20px 0; color: #999; font-size: 12px;'&gt;&quot;);</span>
+<span class="nc" id="L136">        html.append(&quot;&lt;p&gt;Created: &quot;).append(assurance.getCreatedAt().format(formatter)).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (assurance.getUpdatedAt() != null) {</span>
+<span class="nc" id="L138">            html.append(&quot;&lt;p&gt;Updated: &quot;).append(assurance.getUpdatedAt().format(formatter)).append(&quot;&lt;/p&gt;&quot;);</span>
+        }
+<span class="nc" id="L140">        html.append(&quot;&lt;/div&gt;&quot;);</span>
+
+<span class="nc" id="L142">        html.append(&quot;&lt;/body&gt;&lt;/html&gt;&quot;);</span>
+
+<span class="nc" id="L144">        return html.toString();</span>
+    }
+
+    /**
+     * Get color for status badge
+     */
+    private String getStatusColor(String status) {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        switch (status) {</span>
+            case &quot;APPROVED&quot;:
+<span class="nc" id="L153">                return &quot;#10b981&quot;;</span>
+            case &quot;REJECTED&quot;:
+<span class="nc" id="L155">                return &quot;#ef4444&quot;;</span>
+            case &quot;PENDING&quot;:
+<span class="nc" id="L157">                return &quot;#f59e0b&quot;;</span>
+            default:
+<span class="nc" id="L159">                return &quot;#667eea&quot;;</span>
+        }
+    }
+
+    /**
+     * Convert HTML to PDF (simple implementation)
+     */
+    private byte[] convertHtmlToPdf(String htmlContent) throws DocumentException {
+<span class="nc" id="L167">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L168">        Document document = new Document();</span>
+<span class="nc" id="L169">        PdfWriter.getInstance(document, baos);</span>
+<span class="nc" id="L170">        document.open();</span>
+
+        // Simple text conversion - for production, use a proper HTML-to-PDF library
+<span class="nc" id="L173">        Paragraph para = new Paragraph(htmlContent.replaceAll(&quot;&lt;[^&gt;]*&gt;&quot;, &quot;&quot;));</span>
+<span class="nc" id="L174">        document.add(para);</span>
+
+<span class="nc" id="L176">        document.close();</span>
+<span class="nc" id="L177">        return baos.toByteArray();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

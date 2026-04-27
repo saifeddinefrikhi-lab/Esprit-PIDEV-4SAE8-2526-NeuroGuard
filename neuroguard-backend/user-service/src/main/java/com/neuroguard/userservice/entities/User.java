@@ -5,8 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.List;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -27,27 +27,28 @@ public class User {
     private String gender;
     private Integer age;
 
+    private Double longitude;
+    private Double latitude;
+
     @Enumerated(EnumType.STRING)
     private Role role;
 
     private String password;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "caregiver_id")
-    @JsonIgnore // Prevent infinite recursion
-    private User caregiver;
+    @Column
+    private LocalDateTime lastSeen;
 
-    @OneToMany(mappedBy = "caregiver")
-    @JsonIgnore
-    private java.util.List<User> patients;
+    @Column
+    private LocalDateTime bannedUntil;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "doctor_id")
-    @JsonIgnore
-    private User doctor;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserStatus status = UserStatus.ACTIVE;
 
-    @OneToMany(mappedBy = "doctor")
-    @JsonIgnore
-    private java.util.List<User> assignedPatients;
-
+    /**
+     * Incremented whenever a user is banned/disabled,
+     * effectively invalidating all older JWT tokens.
+     */
+    @Column(nullable = false)
+    private long tokenVersion = 0;
 }

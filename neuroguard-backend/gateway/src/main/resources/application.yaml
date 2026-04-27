@@ -18,18 +18,19 @@ spring:
           '[/**]':
             allowedOrigins:
               - "http://localhost:4200"
+              - "http://127.0.0.1:4200"
             allowedMethods:
               - GET
               - POST
               - PUT
+              - PATCH
               - DELETE
               - OPTIONS
-              - PATCH
             allowedHeaders:
               - "*"
             allowCredentials: true
+            maxAge: 3600
       routes:
-        # user-service routes
         - id: user-auth
           uri: lb://user-service
           predicates:
@@ -38,18 +39,11 @@ spring:
           uri: lb://user-service
           predicates:
             - Path=/users/**
-
-        # wellbeing-service routes
-        - id: wellbeing-service
-          uri: lb://wellbeing-service
-          predicates:
-            - Path=/api/wellbeing/**
-
         # medical-history-service routes
         - id: medical-provider
           uri: lb://medical-history-service
           predicates:
-            - Path=/api/provider/medical-history/**
+            - Path=/api/provider/medical-history,/api/provider/medical-history/**
         - id: medical-patient
           uri: lb://medical-history-service
           predicates:
@@ -58,6 +52,10 @@ spring:
           uri: lb://medical-history-service
           predicates:
             - Path=/api/caregiver/medical-history/**
+        - id: medical-statistics
+          uri: lb://medical-history-service
+          predicates:
+            - Path=/api/statistics/**
         - id: medical-files
           uri: lb://medical-history-service
           predicates:
@@ -66,13 +64,6 @@ spring:
           uri: lb://medical-history-service
           predicates:
             - Path=/test
-
-        # forum-service routes
-        - id: forum-service
-          uri: lb://forum-service
-          predicates:
-            - Path=/api/posts/**
-
         # risk-alert-service routes
         - id: risk-patient
           uri: lb://risk-alert-service
@@ -85,13 +76,81 @@ spring:
         - id: risk-provider
           uri: lb://risk-alert-service
           predicates:
-            - Path=/api/provider/alerts/**
-            
-        # monitoring-service routes
-        - id: monitoring-service
-          uri: lb://monitoring-service
+            - Path=/api/provider/alerts,/api/provider/alerts/**
+        - id: risk-ws
+          uri: lb:ws://risk-alert-service
           predicates:
-            - Path=/api/monitoring/**
+            - Path=/ws/alerts/**
+        - id: medical-ws
+          uri: lb:ws://medical-history-service
+          predicates:
+            - Path=/ws/medical-history/**    
+        - id: forum-posts
+          uri: lb://forum-service
+          predicates:
+            - Path=/api/posts/**
+        - id: forum-categories
+          uri: lb://forum-service
+          predicates:
+            - Path=/api/categories/**
+        - id: care-plans
+          uri: lb://careplan-service
+          predicates:
+            - Path=/api/care-plans/**
+        - id: prescriptions
+          uri: lb://prescription-service
+          predicates:
+            - Path=/api/prescriptions/**
+        - id: pharmacies
+          uri: lb://pharmacy-service
+          predicates:
+            - Path=/api/pharmacies,/api/pharmacies/**
+        # Proxy Ollama (set OLLAMA_URI if Ollama runs elsewhere, e.g. http://host:11434)
+        # Strip Ollama's CORS headers to avoid duplicate (gateway CORS adds them once)
+        - id: ollama
+          uri: ${OLLAMA_URI:http://localhost:11434}
+          predicates:
+            - Path=/api/ollama/**
+          filters:
+            - RewritePath=/api/ollama(?<segment>/?.*), /api${segment}
+            # Add CORS first in list so they run AFTER RemoveResponseHeader when response comes back
+            - AddResponseHeader=Access-Control-Allow-Origin,http://localhost:4200
+            - AddResponseHeader=Access-Control-Allow-Credentials,true
+            - RemoveResponseHeader=Access-Control-Allow-Origin
+            - RemoveResponseHeader=Access-Control-Allow-Credentials
+            - RemoveResponseHeader=Access-Control-Expose-Headers
+            - RemoveResponseHeader=Access-Control-Allow-Methods
+            - RemoveResponseHeader=Access-Control-Allow-Headers
+            - RemoveResponseHeader=Access-Control-Max-Age
+        - id: consultation-service
+          uri: lb://consultation-service
+          predicates:
+            - Path=/api/consultations/**
+        - id: availability-service
+          uri: lb://consultation-service
+          predicates:
+            - Path=/api/availability/**
+        - id: consultation-providers
+          uri: lb://consultation-service
+          predicates:
+            - Path=/api/providers/**
+        - id: consultation-distance
+          uri: lb://consultation-service
+          predicates:
+            - Path=/api/distance/**
+        - id: assurance-service
+          uri: lb://assurance-service
+          predicates:
+            - Path=/api/assurances/**
+        - id: assurance-simulations
+          uri: lb://assurance-service
+          predicates:
+            - Path=/api/simulations/**
+        - id: reservation-service
+          uri: lb://reservation-service
+          predicates:
+            - Path=/api/reservations/**
+
 
 logging:
   level:

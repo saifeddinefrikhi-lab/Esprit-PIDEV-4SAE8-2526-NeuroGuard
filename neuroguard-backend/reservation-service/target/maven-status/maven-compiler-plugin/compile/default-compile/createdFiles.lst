@@ -1,0 +1,15 @@
+com\neuroguard\reservationservice\config\JwtAuthenticationFilter.class
+com\neuroguard\reservationservice\repository\ReservationRepository.class
+com\neuroguard\reservationservice\client\ConsultationServiceClient.class
+com\neuroguard\reservationservice\controller\ReservationController.class
+com\neuroguard\reservationservice\config\JwtUtils.class
+com\neuroguard\reservationservice\entity\Reservation.class
+com\neuroguard\reservationservice\config\FeignErrorDecoder.class
+com\neuroguard\reservationservice\ReservationServiceApplication.class
+com\neuroguard\reservationservice\client\UserServiceClient.class
+com\neuroguard\reservationservice\dto\ReservationDto.class
+com\neuroguard\reservationservice\config\SecurityConfig.class
+com\neuroguard\reservationservice\config\FeignClientConfig.class
+com\neuroguard\reservationservice\entity\ReservationStatus.class
+com\neuroguard\reservationservice\service\ReservationService.class
+com\neuroguard\reservationservice\entity\ConsultationType.class

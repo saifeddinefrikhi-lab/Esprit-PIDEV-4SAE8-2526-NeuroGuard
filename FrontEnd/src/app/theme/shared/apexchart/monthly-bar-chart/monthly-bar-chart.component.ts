@@ -1,5 +1,5 @@
 // angular import
-import { Component, OnInit, viewChild } from '@angular/core';
+import { Component, OnInit, Input, viewChild, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 // project import
@@ -14,14 +14,29 @@ import { ChartComponent, ApexOptions } from 'ng-apexcharts';
   templateUrl: './monthly-bar-chart.component.html',
   styleUrl: './monthly-bar-chart.component.scss'
 })
-export class MonthlyBarChartComponent implements OnInit {
+export class MonthlyBarChartComponent implements OnInit, OnChanges {
   // public props
   chart = viewChild.required<ChartComponent>('chart');
   chartOptions!: Partial<ApexOptions>;
 
+  // Input properties
+  @Input() chartData: number[] = [];
+  @Input() chartCategories: string[] = [];
+  @Input() seriesName: string = 'Series';
+
   // life cycle hook
   ngOnInit() {
     document.querySelector('.chart-income.week')?.classList.add('active');
+    this.initializeChart();
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if ((changes['chartData'] || changes['chartCategories']) && this.chartOptions) {
+      this.updateChartData();
+    }
+  }
+
+  private initializeChart() {
     this.chartOptions = {
       chart: {
         height: 450,
@@ -37,12 +52,8 @@ export class MonthlyBarChartComponent implements OnInit {
       colors: ['#1677ff', '#0050b3'],
       series: [
         {
-          name: 'Page Views',
-          data: [0, 86, 28, 115, 48, 210, 136]
-        },
-        {
-          name: 'Sessions',
-          data: [0, 43, 14, 56, 24, 105, 68]
+          name: this.seriesName || 'Series',
+          data: this.chartData && this.chartData.length > 0 ? this.chartData : [0, 86, 28, 115, 48, 210, 136]
         }
       ],
       stroke: {
@@ -50,7 +61,7 @@ export class MonthlyBarChartComponent implements OnInit {
         width: 2
       },
       xaxis: {
-        categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        categories: this.chartCategories && this.chartCategories.length > 0 ? this.chartCategories : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
         labels: {
           style: {
             colors: [
@@ -89,6 +100,18 @@ export class MonthlyBarChartComponent implements OnInit {
         mode: 'light'
       }
     };
+  }
+
+  private updateChartData() {
+    const series = [
+      {
+        name: this.seriesName || 'Series',
+        data: this.chartData || [0, 86, 28, 115, 48, 210, 136]
+      }
+    ];
+    const xaxis = { ...this.chartOptions.xaxis };
+    xaxis.categories = this.chartCategories && this.chartCategories.length > 0 ? this.chartCategories : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    this.chartOptions = { ...this.chartOptions, series, xaxis };
   }
 
   // public method

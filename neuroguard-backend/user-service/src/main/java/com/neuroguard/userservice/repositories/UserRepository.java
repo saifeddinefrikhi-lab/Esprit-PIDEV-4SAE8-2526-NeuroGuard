@@ -15,7 +15,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsername(String username);  // Find user by username
     List<User> findByRole(Role role);
-    
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"caregiver"})
-    List<User> findByCaregiverIdAndRole(Long caregiverId, Role role);
+
+    long countByRole(Role role);
 }

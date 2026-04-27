@@ -1,0 +1,12 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+reservation-service,com.neuroguard.reservationservice.config,JwtUtils,40,0,2,0,10,0,6,0,5,0
+reservation-service,com.neuroguard.reservationservice.config,SecurityConfig,56,0,0,0,12,0,4,0,4,0
+reservation-service,com.neuroguard.reservationservice.config,JwtAuthenticationFilter,88,0,6,0,23,0,5,0,2,0
+reservation-service,com.neuroguard.reservationservice.config,FeignClientConfig,36,0,6,0,9,0,7,0,4,0
+reservation-service,com.neuroguard.reservationservice.config,FeignErrorDecoder,81,0,12,0,18,0,8,0,2,0
+reservation-service,com.neuroguard.reservationservice.entity,ConsultationType,0,15,0,0,0,3,0,1,0,1
+reservation-service,com.neuroguard.reservationservice.entity,ReservationStatus,0,33,0,0,0,6,0,1,0,1
+reservation-service,com.neuroguard.reservationservice.entity,Reservation,4,0,0,0,2,0,1,0,1,0
+reservation-service,com.neuroguard.reservationservice.controller,ReservationController,110,0,0,0,24,0,11,0,11,0
+reservation-service,com.neuroguard.reservationservice,ReservationServiceApplication,8,0,0,0,3,0,2,0,2,0
+reservation-service,com.neuroguard.reservationservice.service,ReservationService,79,725,17,29,19,167,15,32,0,24

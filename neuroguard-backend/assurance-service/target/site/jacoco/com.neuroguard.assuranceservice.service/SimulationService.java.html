@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimulationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">assurance-service</a> &gt; <a href="index.source.html" class="el_package">com.neuroguard.assuranceservice.service</a> &gt; <span class="el_source">SimulationService.java</span></div><h1>SimulationService.java</h1><pre class="source lang-java linenums">package com.neuroguard.assuranceservice.service;
+
+import com.neuroguard.assuranceservice.client.ConsultationClient;
+import com.neuroguard.assuranceservice.dto.ConsultationResponseDto;
+import com.neuroguard.assuranceservice.dto.ProcedureSimulationDto;
+import com.neuroguard.assuranceservice.dto.SimulationResponseDto;
+import com.neuroguard.assuranceservice.entity.Assurance;
+import com.neuroguard.assuranceservice.repository.AssuranceRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+<span class="nc" id="L21">@Slf4j</span>
+public class SimulationService {
+
+    private final ConsultationClient consultationClient;
+    private final AssuranceRepository assuranceRepository;
+
+<span class="nc" id="L27">    private static final Map&lt;String, Double&gt; PROCEDURE_COSTS = new HashMap&lt;&gt;();</span>
+
+    static {
+<span class="nc" id="L30">        PROCEDURE_COSTS.put(&quot;CONSULTATION_GENERAL&quot;, 60.0);</span>
+<span class="nc" id="L31">        PROCEDURE_COSTS.put(&quot;CONSULTATION_SPECIALIST&quot;, 120.0);</span>
+<span class="nc" id="L32">        PROCEDURE_COSTS.put(&quot;MRI_SCAN&quot;, 450.0);</span>
+<span class="nc" id="L33">        PROCEDURE_COSTS.put(&quot;BLOOD_TEST&quot;, 85.0);</span>
+<span class="nc" id="L34">        PROCEDURE_COSTS.put(&quot;COGNITIVE_THERAPY&quot;, 150.0);</span>
+<span class="nc" id="L35">        PROCEDURE_COSTS.put(&quot;HOME_CARE_SESSION&quot;, 75.0);</span>
+<span class="nc" id="L36">    }</span>
+
+    public ProcedureSimulationDto simulateProcedure(Long patientId, String procedureName) {
+<span class="nc" id="L39">        log.info(&quot;Simulating reimbursement for patient: {}, procedure: {}&quot;, patientId, procedureName);</span>
+        
+<span class="nc" id="L41">        Assurance assurance = assuranceRepository.findByPatientId(patientId)</span>
+<span class="nc" id="L42">                .stream().findFirst()</span>
+<span class="nc" id="L43">                .orElse(null);</span>
+
+<span class="nc" id="L45">        Double totalCost = PROCEDURE_COSTS.getOrDefault(procedureName, 100.0);</span>
+        
+        // Default to BASIC 70% if no insurance found
+<span class="nc" id="L48">        Double coveragePercent = 0.70; </span>
+<span class="nc" id="L49">        String coverageLevel = &quot;No Plan Found (Simulated Basic)&quot;;</span>
+
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (assurance != null) {</span>
+<span class="nc" id="L52">            coverageLevel = assurance.getCoverageDetails();</span>
+<span class="nc" id="L53">            String details = coverageLevel.toUpperCase();</span>
+<span class="nc bnc" id="L54" title="All 4 branches missed.">            if (details.contains(&quot;INTENSIVE&quot;) || details.contains(&quot;100%&quot;)) coveragePercent = 1.0;</span>
+<span class="nc bnc" id="L55" title="All 4 branches missed.">            else if (details.contains(&quot;COMPREHENSIVE&quot;) || details.contains(&quot;85%&quot;)) coveragePercent = 0.85;</span>
+<span class="nc bnc" id="L56" title="All 4 branches missed.">            else if (details.contains(&quot;ENHANCED&quot;) || details.contains(&quot;75%&quot;)) coveragePercent = 0.75;</span>
+        }
+        
+<span class="nc" id="L59">        Double reimbursement = totalCost * coveragePercent;</span>
+        
+<span class="nc" id="L61">        return ProcedureSimulationDto.builder()</span>
+<span class="nc" id="L62">                .procedureName(procedureName)</span>
+<span class="nc" id="L63">                .totalBaseCost(totalCost)</span>
+<span class="nc" id="L64">                .insuranceCoverage(coveragePercent)</span>
+<span class="nc" id="L65">                .insuranceReimbursement(reimbursement)</span>
+<span class="nc" id="L66">                .patientRemainder(totalCost - reimbursement)</span>
+<span class="nc" id="L67">                .coverageLevel(coverageLevel)</span>
+<span class="nc" id="L68">                .build();</span>
+    }
+
+    public SimulationResponseDto getRentabilityAnalysis(Long patientId) {
+<span class="nc" id="L72">        log.info(&quot;Performing rentability analysis for patient: {}&quot;, patientId);</span>
+        
+<span class="nc" id="L74">        Assurance assurance = assuranceRepository.findByPatientId(patientId)</span>
+<span class="nc" id="L75">                .stream().findFirst()</span>
+<span class="nc" id="L76">                .orElse(null);</span>
+
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (assurance == null) {</span>
+<span class="nc" id="L79">            log.info(&quot;No insurance found for patient: {}&quot;, patientId);</span>
+            // Return default response for patient without insurance
+<span class="nc" id="L81">            return SimulationResponseDto.builder()</span>
+<span class="nc" id="L82">                    .patientId(patientId)</span>
+<span class="nc" id="L83">                    .currentPlan(&quot;NO_PLAN&quot;)</span>
+<span class="nc" id="L84">                    .monthlyPremium(0.0)</span>
+<span class="nc" id="L85">                    .totalPremiumsPaid(0.0)</span>
+<span class="nc" id="L86">                    .totalBenefitsReceived(0.0)</span>
+<span class="nc" id="L87">                    .benefitCostRatio(0.0)</span>
+<span class="nc" id="L88">                    .rentabilityStatus(&quot;NO_PLAN&quot;)</span>
+<span class="nc" id="L89">                    .optimizationAdvice(List.of(&quot;No insurance plan activated. Subscribe to a plan to get healthcare coverage and analysis.&quot;))</span>
+<span class="nc" id="L90">                    .recommendedPlan(&quot;BASIC&quot;)</span>
+<span class="nc" id="L91">                    .potentialAnnualSavings(960.0) // BASIC plan annual cost</span>
+<span class="nc" id="L92">                    .consultationCount(0)</span>
+<span class="nc" id="L93">                    .estimatedTotalCost(0.0)</span>
+<span class="nc" id="L94">                    .build();</span>
+        }
+
+        // Fetch consultation history to analyze actual usage
+<span class="nc" id="L98">        List&lt;ConsultationResponseDto&gt; history = new ArrayList&lt;&gt;();</span>
+        try {
+<span class="nc" id="L100">            history = consultationClient.getConsultationsByPatient(patientId);</span>
+<span class="nc" id="L101">            log.info(&quot;Retrieved {} consultations for patient: {}&quot;, history.size(), patientId);</span>
+<span class="nc" id="L102">        } catch (Exception e) {</span>
+<span class="nc" id="L103">            log.warn(&quot;Failed to fetch consultation history for patient {}: {}&quot;, patientId, e.getMessage());</span>
+<span class="nc" id="L104">        }</span>
+
+        // Determine plan pricing and coverage based on coverage level
+<span class="nc" id="L107">        String coverageDetails = assurance.getCoverageDetails();</span>
+<span class="nc" id="L108">        Double monthlyPremium = getPremiumForPlan(coverageDetails);</span>
+<span class="nc" id="L109">        Integer monthsActive = 12; // Assume annual analysis</span>
+        
+        // Calculate total benefits received (actual consultation costs saved by insurance)
+<span class="nc" id="L112">        Double averageConsultationCost = 100.0; // Average real-world consultation cost</span>
+<span class="nc" id="L113">        Double totalSavedByInsurance = calculateBenefitsSaved(history, coverageDetails, averageConsultationCost);</span>
+<span class="nc" id="L114">        Double totalPremiums = monthsActive * monthlyPremium;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        Double ratio = totalSavedByInsurance / (totalPremiums &gt; 0 ? totalPremiums : 1);</span>
+
+        // Generate optimization advice based on usage ratio
+<span class="nc" id="L118">        List&lt;String&gt; advice = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L119">        String recommendedPlan = &quot;CURRENT&quot;;</span>
+<span class="nc" id="L120">        Double potentialSavings = 0.0;</span>
+
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (ratio &lt; 0.4) {</span>
+            // Low utilization - patient should downgrade plan
+<span class="nc" id="L124">            advice.add(&quot;Your healthcare consumption is low (Below 40% of your plan value).&quot;);</span>
+<span class="nc" id="L125">            advice.add(&quot;Consider switching to a 'BASIC' plan to reduce monthly premiums.&quot;);</span>
+<span class="nc" id="L126">            recommendedPlan = &quot;BASIC&quot;;</span>
+<span class="nc" id="L127">            Double basicMonthlyPremium = getPremiumForPlan(&quot;BASIC&quot;);</span>
+<span class="nc" id="L128">            potentialSavings = Math.max(0, (monthlyPremium - basicMonthlyPremium) * 12);</span>
+<span class="nc" id="L129">            log.debug(&quot;Low utilization detected - recommended downgrade to BASIC, savings: ${}&quot;, potentialSavings);</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        } else if (ratio &gt; 1.2) {</span>
+            // High utilization - patient should upgrade plan
+<span class="nc" id="L132">            advice.add(&quot;Your healthcare consumption is high (Above 120% of your plan value).&quot;);</span>
+<span class="nc" id="L133">            advice.add(&quot;Switching to 'INTENSIVE' coverage might reduce your out-of-pocket costs significantly.&quot;);</span>
+<span class="nc" id="L134">            recommendedPlan = &quot;INTENSIVE&quot;;</span>
+<span class="nc" id="L135">            Double intensiveMonthlyPremium = getPremiumForPlan(&quot;INTENSIVE&quot;);</span>
+            // Positive difference means upgrade costs more, but covers more
+<span class="nc" id="L137">            potentialSavings = Math.max(0, (monthlyPremium - intensiveMonthlyPremium) * 12);</span>
+<span class="nc" id="L138">            log.debug(&quot;High utilization detected - recommended upgrade to INTENSIVE, additional cost: ${}&quot;, -potentialSavings);</span>
+<span class="nc" id="L139">        } else {</span>
+            // Balanced utilization
+<span class="nc" id="L141">            advice.add(&quot;Your current plan is well-balanced for your healthcare usage.&quot;);</span>
+<span class="nc" id="L142">            advice.add(&quot;Your insurance coverage effectively matches your medical consumption patterns.&quot;);</span>
+<span class="nc" id="L143">            recommendedPlan = &quot;CURRENT&quot;;</span>
+<span class="nc" id="L144">            potentialSavings = 0.0;</span>
+<span class="nc" id="L145">            log.debug(&quot;Balanced utilization detected - current plan is optimal&quot;);</span>
+        }
+
+<span class="nc" id="L148">        return SimulationResponseDto.builder()</span>
+<span class="nc" id="L149">                .patientId(patientId)</span>
+<span class="nc" id="L150">                .currentPlan(formatPlanName(coverageDetails))</span>
+<span class="nc" id="L151">                .monthlyPremium(monthlyPremium)</span>
+<span class="nc" id="L152">                .totalPremiumsPaid(totalPremiums)</span>
+<span class="nc" id="L153">                .totalBenefitsReceived(totalSavedByInsurance)</span>
+<span class="nc" id="L154">                .benefitCostRatio(Math.round(ratio * 100.0) / 100.0) // Round to 2 decimals</span>
+<span class="nc" id="L155">                .rentabilityStatus(determineRentabilityStatus(ratio))</span>
+<span class="nc" id="L156">                .optimizationAdvice(advice)</span>
+<span class="nc" id="L157">                .recommendedPlan(recommendedPlan)</span>
+<span class="nc" id="L158">                .potentialAnnualSavings(potentialSavings)</span>
+<span class="nc" id="L159">                .consultationCount(history.size())</span>
+<span class="nc" id="L160">                .estimatedTotalCost(history.size() * averageConsultationCost)</span>
+<span class="nc" id="L161">                .build();</span>
+    }
+
+    /**
+     * Determine rentability status based on benefit/cost ratio
+     */
+    private String determineRentabilityStatus(Double ratio) {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (ratio &gt;= 0.8) {</span>
+<span class="nc" id="L169">            return &quot;PROFITABLE&quot;;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        } else if (ratio &gt;= 0.4) {</span>
+<span class="nc" id="L171">            return &quot;NEUTRAL&quot;;</span>
+        } else {
+<span class="nc" id="L173">            return &quot;LOSS&quot;;</span>
+        }
+    }
+
+    /**
+     * Format coverage details to human-readable plan name
+     */
+    private String formatPlanName(String coverageDetails) {
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (coverageDetails == null || coverageDetails.isBlank()) {</span>
+<span class="nc" id="L182">            return &quot;UNKNOWN&quot;;</span>
+        }
+        
+<span class="nc" id="L185">        String normalized = coverageDetails.toUpperCase();</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">        if (normalized.contains(&quot;INTENSIVE&quot;) || normalized.contains(&quot;100%&quot;)) {</span>
+<span class="nc" id="L187">            return &quot;INTENSIVE&quot;;</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">        } else if (normalized.contains(&quot;COMPREHENSIVE&quot;) || normalized.contains(&quot;85%&quot;)) {</span>
+<span class="nc" id="L189">            return &quot;COMPREHENSIVE&quot;;</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        } else if (normalized.contains(&quot;ENHANCED&quot;) || normalized.contains(&quot;75%&quot;)) {</span>
+<span class="nc" id="L191">            return &quot;ENHANCED&quot;;</span>
+        } else {
+<span class="nc" id="L193">            return &quot;BASIC&quot;;</span>
+        }
+    }
+
+    /**
+     * Get monthly premium based on coverage level
+     */
+    private Double getPremiumForPlan(String coverageLevel) {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (coverageLevel == null) {</span>
+<span class="nc" id="L202">            return 120.0; // Default</span>
+        }
+        
+<span class="nc" id="L205">        String normalized = coverageLevel.toUpperCase();</span>
+<span class="nc bnc" id="L206" title="All 4 branches missed.">        if (normalized.contains(&quot;INTENSIVE&quot;) || normalized.contains(&quot;100%&quot;)) {</span>
+<span class="nc" id="L207">            return 200.0;</span>
+<span class="nc bnc" id="L208" title="All 4 branches missed.">        } else if (normalized.contains(&quot;COMPREHENSIVE&quot;) || normalized.contains(&quot;85%&quot;)) {</span>
+<span class="nc" id="L209">            return 150.0;</span>
+<span class="nc bnc" id="L210" title="All 4 branches missed.">        } else if (normalized.contains(&quot;ENHANCED&quot;) || normalized.contains(&quot;75%&quot;)) {</span>
+<span class="nc" id="L211">            return 120.0;</span>
+        } else {
+<span class="nc" id="L213">            return 80.0; // BASIC</span>
+        }
+    }
+
+    /**
+     * Calculate actual benefits received based on insurance coverage and consultation history
+     */
+    private Double calculateBenefitsSaved(List&lt;ConsultationResponseDto&gt; consultations, String coverageLevel, Double avgCost) {
+<span class="nc" id="L221">        Double coveragePercent = 0.70; // Default</span>
+        
+<span class="nc" id="L223">        String normalized = coverageLevel.toUpperCase();</span>
+<span class="nc bnc" id="L224" title="All 4 branches missed.">        if (normalized.contains(&quot;INTENSIVE&quot;) || normalized.contains(&quot;100%&quot;)) {</span>
+<span class="nc" id="L225">            coveragePercent = 1.0;</span>
+<span class="nc bnc" id="L226" title="All 4 branches missed.">        } else if (normalized.contains(&quot;COMPREHENSIVE&quot;) || normalized.contains(&quot;85%&quot;)) {</span>
+<span class="nc" id="L227">            coveragePercent = 0.85;</span>
+<span class="nc bnc" id="L228" title="All 4 branches missed.">        } else if (normalized.contains(&quot;ENHANCED&quot;) || normalized.contains(&quot;75%&quot;)) {</span>
+<span class="nc" id="L229">            coveragePercent = 0.75;</span>
+        }
+        
+<span class="nc" id="L232">        return consultations.size() * avgCost * coveragePercent;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

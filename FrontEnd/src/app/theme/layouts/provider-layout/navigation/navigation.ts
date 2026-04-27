@@ -55,9 +55,25 @@ export const NavigationItems: NavigationItem[] = [
         id: 'patient-history',
         title: 'Medical History',
         type: 'item',
-        url: '/provider/medical-history', // Path to view/manage patient medical history
+        url: '/provider/medical-history',
         classes: 'nav-item',
-        icon: 'book', // Ant Design book icon
+        icon: 'book',
+      },
+      {
+        id: 'care-plans',
+        title: 'Care Plans',
+        type: 'item',
+        url: '/provider/care-plans',
+        classes: 'nav-item',
+        icon: 'heart',
+      },
+      {
+        id: 'prescriptions',
+        title: 'Prescriptions',
+        type: 'item',
+        url: '/provider/prescriptions',
+        classes: 'nav-item',
+        icon: 'file-text',
       },
       {
         id: 'patient-medications',
@@ -66,14 +82,6 @@ export const NavigationItems: NavigationItem[] = [
         url: '/provider/medications', // Path to manage patient medications
         classes: 'nav-item',
         icon: 'medicine-box', // Ant Design medicine-box icon
-      },
-      {
-        id: 'patient-monitoring',
-        title: 'Patient Monitoring',
-        type: 'item',
-        url: '/provider/monitoring',
-        classes: 'nav-item',
-        icon: 'activity',
       },
     ]
   },
@@ -84,11 +92,20 @@ export const NavigationItems: NavigationItem[] = [
     icon: 'schedule', // Ant Design schedule icon
     children: [
       {
+        id: 'find-nearby',
+        title: 'Find Nearby Doctors',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/provider/find-nearby-doctors',
+        icon: 'appstore',
+        breadcrumbs: false
+      },
+      {
         id: 'schedule-appointments',
         title: 'Schedule Appointments',
         type: 'item',
         classes: 'nav-item',
-        url: '/provider/appointments/schedule', // Path to schedule appointments
+        url: '/provider/consultations', // Existing route for scheduling consultations
         icon: 'calendar', // Ant Design calendar icon
       },
       {
@@ -96,7 +113,7 @@ export const NavigationItems: NavigationItem[] = [
         title: 'View Appointments',
         type: 'item',
         classes: 'nav-item',
-        url: '/provider/appointments', // Path to view appointments
+        url: '/provider/reservations', // Path to view appointments
         icon: 'calendar', // Ant Design calendar icon
       },
     ]
@@ -105,13 +122,21 @@ export const NavigationItems: NavigationItem[] = [
     id: 'consultation-management',
     title: 'Consultation Management',
     type: 'group',
-    icon: 'stethoscope', // Ant Design stethoscope icon
+    icon: 'schedule', // Ant Design schedule icon
     children: [
+      {
+        id: 'my-availability',
+        title: 'My Availability',
+        type: 'item',
+        url: '/provider/availability',
+        classes: 'nav-item',
+        icon: 'calendar',
+      },
       {
         id: 'consultation-schedule',
         title: 'Schedule Consultation',
         type: 'item',
-        url: '/provider/consultations/schedule', // Path to schedule consultations
+        url: '/provider/consultations', // Path to schedule consultations
         classes: 'nav-item',
         icon: 'schedule', // Ant Design schedule icon
       },
@@ -136,7 +161,7 @@ export const NavigationItems: NavigationItem[] = [
         title: 'Critical Alerts',
         type: 'item',
         classes: 'nav-item',
-        url: '/provider/alerts/critical', // Path to view critical alerts
+        url: '/provider/alerts', // Path to view critical alerts
         icon: 'warning', // Ant Design warning icon
       },
       {
@@ -157,9 +182,9 @@ export const NavigationItems: NavigationItem[] = [
     children: [
       {
         id: 'generate-reports',
-        title: 'Generate Reports',
+        title: 'Forums',
         type: 'item',
-        url: '/provider/reports/generate', // Path to generate reports
+        url: '/provider/forum', // Path to generate reports
         classes: 'nav-item',
         icon: 'file-text', // Ant Design file-text icon
       },
@@ -173,7 +198,7 @@ export const NavigationItems: NavigationItem[] = [
       },
     ]
   },
-
-
+  
+  
 ];
 

@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    environment {
+        GIT_REPO       = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH     = 'main'
+        SONAR_TOKEN    = credentials('sonar-token')
+        SONAR_HOST_URL = credentials('sonar-host-url')
+        DOCKER_IMAGE   = "neuroguard/ml-predictor-service"
+        DOCKER_TAG     = "${env.BUILD_NUMBER}"
+        SERVICE_DIR    = "neuroguard-backend/ml-predictor-service"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git branch: "${GIT_BRANCH}",
+                    url: "${GIT_REPO}"
+            }
+        }
+
+        stage('Install Python dependencies') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh '''
+                        python3 -m venv .venv
+                        . .venv/bin/activate
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
+                        pip install pytest pytest-cov
+                    '''
+                }
+            }
+        }
+
+        stage('Pytest Tests') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh '''
+                        . .venv/bin/activate
+                        pytest test_api.py test_alzheimers_api.py -v \
+                            --junitxml=test-results.xml \
+                            --cov=. \
+                            --cov-report=xml:coverage.xml \
+                            --ignore=java-integration || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: "${SERVICE_DIR}/test-results.xml"
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                            sonar-scanner \
+                                -Dsonar.projectKey=neuroguard-ml-predictor-service \
+                                -Dsonar.projectName="NeuroGuard - ML Predictor Service" \
+                                -Dsonar.sources=. \
+                                -Dsonar.python.coverage.reportPaths=coverage.xml \
+                                -Dsonar.python.xunit.reportPath=test-results.xml \
+                                -Dsonar.exclusions=**/__pycache__/**,**/data/**,*.pkl,*.png
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: false } }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
+                }
+            }
+        }
+    }
+
+    post { always { cleanWs() } }
+}

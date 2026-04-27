@@ -45,35 +45,11 @@ export const NavigationItems: NavigationItem[] = [
     children: [
       {
         id: 'manage-providers',
-        title: 'Healthcare Providers',
+        title: 'Users',
         type: 'item',
-        url: '/admin/providers',
+        url: '/admin/users',
         classes: 'nav-item',
         icon: 'user-add', // Ant Design user-add icon
-      },
-      {
-        id: 'manage-caregivers',
-        title: 'Caregivers',
-        type: 'item',
-        url: '/admin/caregivers',
-        classes: 'nav-item',
-        icon: 'team', // Ant Design team icon
-      },
-      {
-        id: 'manage-patients',
-        title: 'Patients',
-        type: 'item',
-        url: '/admin/patients',
-        classes: 'nav-item',
-        icon: 'idcard', // Ant Design idcard icon
-      },
-      {
-        id: 'manage-roles',
-        title: 'Manage Roles',
-        type: 'item',
-        url: '/admin/roles',
-        classes: 'nav-item',
-        icon: 'lock', // Ant Design lock icon
       },
     ]
   },
@@ -109,19 +85,51 @@ export const NavigationItems: NavigationItem[] = [
     children: [
       {
         id: 'manage-medications',
-        title: 'Manage Medications',
+        title: 'Pharmacies & Clinics',
         type: 'item',
-        url: '/admin/medications',
+        url: '/admin/pharmacies-clinics',
         classes: 'nav-item',
         icon: 'medicine-box', // Ant Design medicine-box icon
       },
       {
         id: 'manage-medical-history',
-        title: 'Manage Medical History',
+        title: 'Medical History',
         type: 'item',
         url: '/admin/medical-history',
         classes: 'nav-item',
-        icon: 'book', // Ant Design book icon
+        icon: 'book',
+      },
+      {
+        id: 'manage-care-plans',
+        title: 'Care Plans',
+        type: 'item',
+        url: '/admin/care-plans',
+        classes: 'nav-item',
+        icon: 'heart',
+      },
+      {
+        id: 'manage-prescriptions',
+        title: 'Prescriptions',
+        type: 'item',
+        url: '/admin/prescriptions',
+        classes: 'nav-item',
+        icon: 'file-text',
+      },
+      {
+        id: 'care-plans-stats',
+        title: 'Care Plan Statistics',
+        type: 'item',
+        url: '/admin/care-plans/stats',
+        classes: 'nav-item',
+        icon: 'bar-chart',
+      },
+      {
+        id: 'risk-analysis',
+        title: 'Prescription Analysis',
+        type: 'item',
+        url: '/admin/risk-analysis',
+        classes: 'nav-item',
+        icon: 'bar-chart',
       },
     ]
   },
@@ -131,6 +139,14 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'file-pdf',  // Ant Design file-pdf icon
     children: [
+     {
+        id: 'generate-reports',
+        title: 'Forums',
+        type: 'item',
+        url: '/admin/forum', // Path to generate reports
+        classes: 'nav-item',
+        icon: 'file-text', // Ant Design file-text icon
+      },
       {
         id: 'patient-reports',
         title: 'Patient Reports',
@@ -140,46 +156,15 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'book', // Ant Design file icon
       },
       {
-        id: 'appointment-reports',
-        title: 'Appointment Reports',
+        id: 'assurance-reports',
+        title: 'Assurance Reports',
         type: 'item',
-        url: '/admin/reports/appointments',
+        url: '/admin/assurance',
         classes: 'nav-item',
-        icon: 'calendar', // Ant Design calendar icon
+        icon: 'file-text', // Ant Design file-text icon
       },
     ]
   },
-  {
-    id: 'wellbeing',
-    title: 'Wellbeing Management',
-    type: 'group',
-    icon: 'heart',
-    children: [
-      {
-        id: 'wellbeing-dashboard',
-        title: 'Wellbeing Dashboard',
-        type: 'item',
-        url: '/admin/wellbeing',
-        classes: 'nav-item',
-        icon: 'heart',
-      }
-    ]
-  },
-  {
-    id: 'monitoring',
-    title: 'Patient Monitoring',
-    type: 'group',
-    icon: 'activity',
-    children: [
-      {
-        id: 'monitoring-dashboard',
-        title: 'Monitoring Dashboard',
-        type: 'item',
-        url: '/admin/monitoring',
-        classes: 'nav-item',
-        icon: 'activity',
-      }
-    ]
-  },
+  
 ];
 

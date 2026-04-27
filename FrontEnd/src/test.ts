@@ -1,3 +1,4 @@
+(window as any).global = window;
 import 'zone.js/testing';
 import { getTestBed } from '@angular/core/testing';
 import {
@@ -5,7 +6,7 @@ import {
   platformBrowserDynamicTesting
 } from '@angular/platform-browser-dynamic/testing';
 
-// Initialize the Angular testing environment.
+// First, initialize the Angular testing environment.
 getTestBed().initTestEnvironment(
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting(),

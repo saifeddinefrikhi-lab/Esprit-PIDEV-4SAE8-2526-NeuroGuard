@@ -20,7 +20,21 @@ import {
   FontSizeOutline,
   ProfileOutline,
   BgColorsOutline,
-  AntDesignOutline
+  AntDesignOutline,
+  HeartOutline,
+  BarChartOutline,
+  HomeOutline,
+  UserOutline,
+  UserAddOutline,
+  TeamOutline,
+  IdcardOutline,
+  LockOutline,
+  ScheduleOutline,
+  CalendarOutline,
+  MedicineBoxOutline,
+  BookOutline,
+  FileTextOutline,
+  FileOutline
 } from '@ant-design/icons-angular/icons';
 import { NgScrollbarModule } from 'ngx-scrollbar';
 
@@ -28,7 +42,8 @@ import { NgScrollbarModule } from 'ngx-scrollbar';
   selector: 'app-nav-content',
   imports: [CommonModule, RouterModule, NavGroupComponent, NgScrollbarModule],
   templateUrl: './nav-content.component.html',
-  styleUrls: ['./nav-content.component.scss']
+  styleUrls: ['./nav-content.component.scss'],
+  host: { 'data-layout': 'admin', 'data-nav': 'nav-content' }
 })
 export class NavContentComponent implements OnInit {
   private location = inject(Location);
@@ -59,7 +74,21 @@ export class NavContentComponent implements OnInit {
         BgColorsOutline,
         AntDesignOutline,
         ChromeOutline,
-        QuestionOutline
+        QuestionOutline,
+        HeartOutline,
+        BarChartOutline,
+        HomeOutline,
+        UserOutline,
+        UserAddOutline,
+        TeamOutline,
+        IdcardOutline,
+        LockOutline,
+        ScheduleOutline,
+        CalendarOutline,
+        MedicineBoxOutline,
+        BookOutline,
+        FileTextOutline,
+        FileOutline
       ]
     );
     this.navigations = NavigationItems;
@@ -98,7 +127,8 @@ export class NavContentComponent implements OnInit {
   }
 
   navMob() {
-    if (this.windowWidth < 1025 && document.querySelector('app-navigation.coded-navbar').classList.contains('mob-open')) {
+    const navElement = document.querySelector('app-navigation.coded-navbar');
+    if (this.windowWidth < 1025 && navElement !== null && navElement.classList.contains('mob-open')) {
       this.NavCollapsedMob.emit();
     }
   }

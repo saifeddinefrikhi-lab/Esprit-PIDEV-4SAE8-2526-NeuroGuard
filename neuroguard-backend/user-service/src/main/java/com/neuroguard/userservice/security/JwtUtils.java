@@ -18,12 +18,17 @@ public class JwtUtils {
 
     private final Set<String> invalidatedTokens = new HashSet<>();
 
-    public String generateJwtToken(String username, String role, Long userId) {  // add userId parameter
+    public String generateJwtToken(String username, String role, Long userId) {
+        return generateJwtToken(username, role, userId, 0L);
+    }
+
+    public String generateJwtToken(String username, String role, Long userId, long tokenVersion) {
         Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
         return JWT.create()
                 .withSubject(username)
                 .withClaim("role", role)
-                .withClaim("userId", userId)          // <-- new claim
+                .withClaim("userId", userId)
+                .withClaim("tokenVersion", tokenVersion)
                 .withIssuedAt(new Date())
                 .withExpiresAt(new Date(System.currentTimeMillis() + 86400000))
                 .sign(algorithm);

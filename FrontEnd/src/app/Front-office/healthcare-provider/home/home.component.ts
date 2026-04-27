@@ -1,146 +1,260 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
-// Project import
-import tableData from 'src/fake-data/default-data.json';
-
-import { MonthlyBarChartComponent } from 'src/app/theme/shared/apexchart/monthly-bar-chart/monthly-bar-chart.component';
-import { IncomeOverviewChartComponent } from 'src/app/theme/shared/apexchart/income-overview-chart/income-overview-chart.component';
-import { AnalyticsChartComponent } from 'src/app/theme/shared/apexchart/analytics-chart/analytics-chart.component';
-import { SalesReportChartComponent } from 'src/app/theme/shared/apexchart/sales-report-chart/sales-report-chart.component';
-
-// Icons
+import { StatisticsService, ProviderStatisticsDTO } from 'src/app/core/services/statistics.service';
 import { IconService, IconDirective } from '@ant-design/icons-angular';
-import { FallOutline, GiftOutline, MessageOutline, RiseOutline, SettingOutline, UserAddOutline, TeamOutline } from '@ant-design/icons-angular/icons';
+import { RiseOutline, FallOutline } from '@ant-design/icons-angular/icons';
 import { CardComponent } from 'src/app/theme/shared/components/card/card.component';
-import {
-  HomeOutline,
-  DashboardOutline,
-  UserOutline,
-  IdcardOutline,
-  BookOutline,
-  MedicineBoxOutline,
-  CalendarOutline,
-  ScheduleOutline,
-  HistoryOutline,
-  BellOutline,
-  FilePdfOutline,
-  FileTextOutline,
-  BarChartOutline,
-  WarningOutline,
-} from '@ant-design/icons-angular/icons';
+import { AlertTrendsChartComponent } from 'src/app/theme/shared/apexchart/alert-trends-chart/alert-trends-chart.component';
+import { ProgressionChartComponent } from 'src/app/theme/shared/apexchart/progression-chart/progression-chart.component';
+import { HealthRiskChartComponent } from 'src/app/theme/shared/apexchart/health-risk-chart/health-risk-chart.component';
+import { CognitiveAssessmentChartComponent } from 'src/app/theme/shared/apexchart/cognitive-assessment-chart/cognitive-assessment-chart.component';
 
+interface ChartPoint {
+  label: string;
+  value: number;
+  percent: number;
+  colorClass: string;
+}
+
+/**
+ * Refactored Provider Home Component
+ * Uses backend statistics service instead of client-side aggregation
+ * Single API call to get aggregated provider statistics
+ */
 @Component({
   selector: 'app-home',
   imports: [
     CommonModule,
     CardComponent,
     IconDirective,
-    MonthlyBarChartComponent,
-    IncomeOverviewChartComponent,
-    AnalyticsChartComponent,
-    SalesReportChartComponent
+    AlertTrendsChartComponent,
+    ProgressionChartComponent,
+    HealthRiskChartComponent,
+    CognitiveAssessmentChartComponent
   ],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
   private iconService = inject(IconService);
+  private statisticsService = inject(StatisticsService);
+  private cdr = inject(ChangeDetectorRef);
 
   constructor() {
-    this.iconService.addIcon(...[RiseOutline, FallOutline, SettingOutline, GiftOutline, MessageOutline,HomeOutline,
-      HomeOutline,
-    DashboardOutline,
-    UserOutline,
-    IdcardOutline,
-    BookOutline,
-    MedicineBoxOutline,
-    CalendarOutline,
-    ScheduleOutline,
-    HistoryOutline,
-    BellOutline,
-    FilePdfOutline,
-    FileTextOutline,
-    BarChartOutline,
-    WarningOutline
+    this.iconService.addIcon(...[RiseOutline, FallOutline]);
+  }
+
+  loadingStats = true;
+
+  // Chart data properties
+  criticalAlertsCount: number = 0;
+  warningAlertsCount: number = 0;
+  infoAlertsCount: number = 0;
+  mildCasesCount: number = 0;
+  moderateCasesCount: number = 0;
+  severeCasesCount: number = 0;
+
+  // New chart data properties
+  averageMMSE: number = 0;
+  averageFunctionalAssessment: number = 0;
+  averageADL: number = 0;
+  patientsWithGeneticRisk: number = 0;
+  patientsWithComorbidities: number = 0;
+  patientsWithAllergies: number = 0;
+
+  AnalyticEcommerce = [
+    { title: 'Medical Histories', amount: '0', background: 'bg-light-primary', border: 'border-primary', icon: 'rise', percentage: '0%', color: 'text-primary', number: 'Provider records', note: 'Total recorded medical histories' },
+    { title: 'Severe Progression Cases', amount: '0', background: 'bg-light-success', border: 'border-success', icon: 'rise', percentage: '0%', color: 'text-success', number: 'Severe stage patients', note: 'Cases at highest progression stage' },
+    { title: 'Pending Risk Alerts', amount: '0', background: 'bg-light-warning', border: 'border-warning', icon: 'fall', percentage: '0%', color: 'text-warning', number: 'Unresolved alerts', note: 'Alerts requiring action' },
+    { title: 'Critical Risk Alerts', amount: '0', background: 'bg-light-danger', border: 'border-danger', icon: 'fall', percentage: '0%', color: 'text-danger', number: 'Critical unresolved alerts', note: 'Highest urgency risks' }
+  ];
+
+  severityChart: ChartPoint[] = [];
+  statusChart: ChartPoint[] = [];
+  progressionChart: ChartPoint[] = [];
+  latestRiskAlerts: any[] = [];
+
+  ngOnInit(): void {
+    setTimeout(() => this.loadStatistics());
+  }
+
+  /**
+   * Load statistics from backend (single API call)
+   * Backend aggregates patient data, progression stages, and alerts
+   */
+  private loadStatistics(): void {
+    this.loadingStats = true;
+
+    // Single API call to get all provider statistics
+    this.statisticsService.getMyProviderStatistics()
+      .pipe(
+        catchError(error => {
+          console.error('Failed to load provider statistics:', error);
+          this.loadingStats = false;
+          this.cdr.detectChanges();
+          return of(null);
+        })
+      )
+      .subscribe(statistics => {
+        if (statistics) {
+          setTimeout(() => {
+            this.updateProviderStats(statistics);
+            this.loadingStats = false;
+            this.cdr.detectChanges();
+          });
+        }
+      });
+  }
+
+  /**
+   * Update UI with statistics from backend
+   * All aggregations performed on backend via table joins
+   */
+  private updateProviderStats(stats: ProviderStatisticsDTO): void {
+    const severeCaseRate = this.calculatePercent(stats.severeCases, stats.totalPatients);
+    const pendingRate = this.calculatePercent(stats.pendingAlerts, stats.totalAlerts);
+    const criticalRate = this.calculatePercent(stats.criticalAlerts, stats.totalAlerts);
+    const healthRiskRate = this.calculatePercent(stats.patientsWithHealthRisks, stats.totalPatients);
+
+    // Set chart data from backend statistics
+    this.criticalAlertsCount = stats.criticalAlerts;
+    this.warningAlertsCount = stats.warningAlerts;
+    this.infoAlertsCount = stats.infoAlerts;
+    this.mildCasesCount = stats.mildCases;
+    this.moderateCasesCount = stats.moderateCases;
+    this.severeCasesCount = stats.severeCases;
+    this.averageMMSE = stats.averageMMSE;
+    this.averageFunctionalAssessment = stats.averageFunctionalAssessment;
+    this.averageADL = stats.averageADL;
+    this.patientsWithGeneticRisk = Math.round(stats.patientsWithGeneticRisk);
+    this.patientsWithComorbidities = stats.patientsWithComorbidities;
+    this.patientsWithAllergies = stats.patientsWithAllergies;
+
+    this.AnalyticEcommerce = [
+      {
+        title: 'Medical Histories',
+        amount: String(stats.totalMedicalHistories),
+        background: 'bg-light-primary',
+        border: 'border-primary',
+        icon: 'rise',
+        percentage: Math.round(stats.historyCoverage) + '%',
+        color: 'text-primary',
+        number: 'Provider records',
+        note: 'Total recorded medical histories'
+      },
+      {
+        title: 'Severe Progression Cases',
+        amount: String(stats.severeCases),
+        background: 'bg-light-success',
+        border: 'border-success',
+        icon: 'rise',
+        percentage: `${severeCaseRate}%`,
+        color: 'text-success',
+        number: 'Severe stage patients',
+        note: 'Cases at highest progression stage'
+      },
+      {
+        title: 'Pending Risk Alerts',
+        amount: String(stats.pendingAlerts),
+        background: 'bg-light-warning',
+        border: 'border-warning',
+        icon: 'fall',
+        percentage: `${pendingRate}%`,
+        color: 'text-warning',
+        number: 'Unresolved alerts',
+        note: 'Alerts requiring action'
+      },
+      {
+        title: 'Critical Risk Alerts',
+        amount: String(stats.criticalAlerts),
+        background: 'bg-light-danger',
+        border: 'border-danger',
+        icon: 'fall',
+        percentage: `${criticalRate}%`,
+        color: 'text-danger',
+        number: 'Critical unresolved alerts',
+        note: 'Highest urgency risks'
+      },
+      // New cards
+      {
+        title: 'Patients with Health Risks',
+        amount: String(stats.patientsWithHealthRisks),
+        background: 'bg-light-danger',
+        border: 'border-danger',
+        icon: 'fall',
+        percentage: `${healthRiskRate}%`,
+        color: 'text-danger',
+        number: 'At-risk population',
+        note: 'Patients with comorbidities or genetic risk'
+      },
+      {
+        title: 'Average Cognitive Score',
+        amount: stats.averageMMSE.toFixed(1),
+        background: 'bg-light-info',
+        border: 'border-info',
+        icon: 'rise',
+        percentage: `${Math.round((stats.averageMMSE / 30) * 100)}%`,
+        color: 'text-info',
+        number: 'MMSE (0-30)',
+        note: 'Population cognitive health'
+      },
+      {
+        title: 'High-Risk Patient Count',
+        amount: String(stats.totalPatients - stats.mildCases),
+        background: 'bg-light-warning',
+        border: 'border-warning',
+        icon: 'fall',
+        percentage: `${this.calculatePercent(stats.totalPatients - stats.mildCases, stats.totalPatients)}%`,
+        color: 'text-warning',
+        number: 'Moderate + Severe',
+        note: 'Patients beyond mild progression'
+      },
+      {
+        title: 'Patient Health Risk Load',
+        amount: stats.averageRiskFactors.toFixed(1),
+        background: 'bg-light-orange',
+        border: 'border-orange',
+        icon: 'fall',
+        percentage: Math.round(stats.patientsWithComorbidities + stats.patientsWithAllergies) + ' patients',
+        color: 'text-orange',
+        number: 'Avg conditions',
+        note: 'Average health conditions per patient'
+      }
+    ];
+
+    // Build severity chart - using existing chart rendering
+    this.severityChart = this.buildChart([
+      { label: 'Critical', value: stats.criticalAlerts, colorClass: 'bg-danger' },
+      { label: 'Warning', value: stats.warningAlerts, colorClass: 'bg-warning' },
+      { label: 'Info', value: stats.infoAlerts, colorClass: 'bg-info' }
+    ]);
+
+    // Build status chart
+    this.statusChart = this.buildChart([
+      { label: 'Pending', value: stats.pendingAlerts, colorClass: 'bg-warning' },
+      { label: 'Resolved', value: stats.resolvedAlerts, colorClass: 'bg-success' }
+    ]);
+
+    // Build progression chart
+    this.progressionChart = this.buildChart([
+      { label: 'Mild', value: stats.mildCases, colorClass: 'bg-primary' },
+      { label: 'Moderate', value: stats.moderateCases, colorClass: 'bg-warning' },
+      { label: 'Severe', value: stats.severeCases, colorClass: 'bg-danger' }
     ]);
   }
 
-  // Fake Data for Alzheimer's Application Analytics and Transactions
+  private buildChart(series: Array<{ label: string; value: number; colorClass: string }>): ChartPoint[] {
+    const maxValue = Math.max(1, ...series.map(item => item.value));
+    return series.map(item => ({
+      ...item,
+      percent: Math.round((item.value / maxValue) * 100)
+    }));
+  }
 
-  recentOrder = [
-    { id: 'ORD1234', name: 'Alzheimer’s Medication 1', status: 'Delivered', status_type: 'success', quantity: 3, amount: '$450' },
-    { id: 'ORD5678', name: 'Alzheimer’s Medication 2', status: 'Pending', status_type: 'warning', quantity: 2, amount: '$320' },
-    { id: 'ORD91011', name: 'Monitoring Device', status: 'Shipped', status_type: 'info', quantity: 1, amount: '$100' },
-  ];
-
-  AnalyticEcommerce = [
-    {
-      title: 'Total Patient Visits',
-      amount: '1,20,000',
-      background: 'bg-light-primary ',
-      border: 'border-primary',
-      icon: 'rise',
-      percentage: '30%',
-      color: 'text-primary',
-      number: '35,000'
-    },
-    {
-      title: 'Total Active Patients',
-      amount: '45,000',
-      background: 'bg-light-success ',
-      border: 'border-success',
-      icon: 'rise',
-      percentage: '25%',
-      color: 'text-success',
-      number: '8,900'
-    },
-    {
-      title: 'Medications Delivered',
-      amount: '20,000',
-      background: 'bg-light-warning ',
-      border: 'border-warning',
-      icon: 'fall',
-      percentage: '60%',
-      color: 'text-warning',
-      number: '15,000'
-    },
-    {
-      title: 'Monitoring Devices Issued',
-      amount: '12,000',
-      background: 'bg-light-info ',
-      border: 'border-info',
-      icon: 'rise',
-      percentage: '50%',
-      color: 'text-info',
-      number: '6,500'
-    }
-  ];
-
-  transaction = [
-    {
-      background: 'text-success bg-light-success',
-      icon: 'gift',
-      title: 'Patient #112233 Medication Order',
-      time: 'Today, 2:00 AM',
-      amount: '+ $150',
-      percentage: '78%'
-    },
-    {
-      background: 'text-primary bg-light-primary',
-      icon: 'message',
-      title: 'Patient #445566 Medication Order',
-      time: '5 August, 1:45 PM',
-      amount: '- $180',
-      percentage: '8%'
-    },
-    {
-      background: 'text-danger bg-light-danger',
-      icon: 'setting',
-      title: 'Patient #778899 Monitoring Device',
-      time: '7 hours ago',
-      amount: '- $320',
-      percentage: '16%'
-    }
-  ];
+  private calculatePercent(value: number, total: number): number {
+    return total > 0 ? Math.round((value / total) * 100) : 0;
+  }
 }

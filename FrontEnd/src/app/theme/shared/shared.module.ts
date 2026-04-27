@@ -7,7 +7,8 @@ import { CardComponent } from './components/card/card.component';
 
 // third party
 import { NgScrollbarModule } from 'ngx-scrollbar';
-import { IconDirective } from '@ant-design/icons-angular';
+import { IconDirective, IconService } from '@ant-design/icons-angular';
+import { CloseOutline } from '@ant-design/icons-angular/icons';
 
 // bootstrap import
 import {
@@ -53,4 +54,12 @@ import {
     IconDirective
   ]
 })
-export class SharedModule {}
+export class SharedModule {
+  constructor(private iconService: IconService) {
+    // Register icons to prevent "IconNotFoundError"
+    this.iconService.addIcon(...[CloseOutline]);
+    
+    // Fallback for close-o (legacy name often used in templates)
+    this.iconService.addIcon({ ...CloseOutline, name: 'close-o' });
+  }
+}

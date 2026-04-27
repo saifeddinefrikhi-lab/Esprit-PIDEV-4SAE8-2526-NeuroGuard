@@ -34,7 +34,7 @@ export const NavigationItems: NavigationItem[] = [
         url: '/caregiver/home', // Path to caregiver dashboard
         icon: 'home', // Ant Design dashboard icon
         breadcrumbs: false
-      },
+      }
     ]
   },
   {
@@ -57,7 +57,7 @@ export const NavigationItems: NavigationItem[] = [
         type: 'item',
         classes: 'nav-item',
         url: '/caregiver/consultations', // Path to manage consultations
-        icon: 'schedule', // Ant Design stethoscope icon
+        icon: 'schedule', // Ant Design schedule icon
       },
     ]
   },
@@ -72,16 +72,8 @@ export const NavigationItems: NavigationItem[] = [
         title: 'Alerts',
         type: 'item',
         classes: 'nav-item',
-        url: '/caregiver/alerts', // Path to manage alerts for caregivers
+        url: '/caregiver/alerts', // Path to manage alerts for caregivers 
         icon: 'bell', // Ant Design bell icon
-      },
-      {
-        id: 'monitoring',
-        title: 'Patient Monitoring',
-        type: 'item',
-        url: '/caregiver/monitoring',
-        classes: 'nav-item',
-        icon: 'activity',
       },
     ]
   },
@@ -96,8 +88,8 @@ export const NavigationItems: NavigationItem[] = [
         title: 'Patient Well-being',
         type: 'item',
         classes: 'nav-item',
-        url: '/caregiver/wellbeing', // Path to monitor patient well-being
-        icon: 'heart', // Ant Design heart icon
+        url: '/caregiver/well-being', // Path to monitor patient well-being
+        icon: 'book', // Ant Design smile icon
       },
     ]
   },
@@ -112,9 +104,51 @@ export const NavigationItems: NavigationItem[] = [
         title: 'View Medical History',
         type: 'item',
         classes: 'nav-item',
-        url: '/caregiver/medical-history', // Path to view patient medical history
+        url: '/caregiver/medical-history/patients',
+        icon: 'file-text',
+      },
+      {
+        id: 'care-plans',
+        title: 'Care Plans',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/caregiver/care-plans',
+        icon: 'heart',
+      },
+      {
+        id: 'prescriptions',
+        title: 'Prescriptions',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/caregiver/prescriptions',
+        icon: 'file-text',
+      },
+      {
+        id: 'generate-reports',
+        title: 'Forums',
+        type: 'item',
+        url: '/caregiver/forum', // Path to generate reports
+        classes: 'nav-item',
         icon: 'file-text', // Ant Design file-text icon
       },
+
+    ]
+  },
+  {
+    id: 'reports',
+    title: 'Reports',
+    type: 'group',
+    icon: 'file-pdf',  // Ant Design file-pdf icon
+    children: [
+      {
+        id: 'generate-reports',
+        title: 'Forums',
+        type: 'item',
+        url: '/caregiver/forum', // Path to generate reports
+        classes: 'nav-item',
+        icon: 'file-text', // Ant Design file-text icon
+      },
+
     ]
   },
 ];

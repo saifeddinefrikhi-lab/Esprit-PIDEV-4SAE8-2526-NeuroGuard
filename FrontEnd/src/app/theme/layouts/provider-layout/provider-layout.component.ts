@@ -8,11 +8,12 @@ import { SharedModule } from '../../shared/shared.module';
 import { NavBarComponent } from './nav-bar/nav-bar.component';
 import { NavigationComponent } from './navigation/navigation.component';
 import { BreadcrumbComponent } from '../../shared/components/breadcrumb/breadcrumb.component';
+import { ChatboxComponent } from '../../shared/components/chatbox/chatbox.component';
 import { LayoutStateService } from '../../shared/service/layout-state.service';
 
 @Component({
   selector: 'app-provider',
-  imports: [CommonModule, SharedModule, NavigationComponent, NavBarComponent, RouterModule, BreadcrumbComponent],
+  imports: [CommonModule, SharedModule, NavigationComponent, NavBarComponent, RouterModule, BreadcrumbComponent, ChatboxComponent],
   templateUrl: './provider-layout.component.html',
   styleUrls: ['./provider-layout.component.scss']
 })

@@ -21,8 +21,8 @@ export interface NavigationItem {
 
 export const NavigationItems: NavigationItem[] = [
   {
-    id: 'acceuil',
-    title: 'Acceuil',
+    id: 'dashboard',
+    title: 'Dashboard',
     type: 'group',
     icon: 'home', // Ant Design home icon
     children: [
@@ -66,10 +66,18 @@ export const NavigationItems: NavigationItem[] = [
     icon: 'schedule', // Ant Design schedule icon
     children: [
       {
+        id: 'find-nearby',
+        title: 'Find Nearby Doctors',
+        type: 'item',
+        url: '/patient/find-nearby-doctors',
+        icon: 'appstore',
+        breadcrumbs: false
+      },
+      {
         id: 'reservation',
         title: 'Make a Reservation',
         type: 'item',
-        url: '/patient/reservation',
+        url: '/patient/reservations',
         icon: 'calendar'
       },
       {
@@ -92,7 +100,7 @@ export const NavigationItems: NavigationItem[] = [
         id: 'wellness',
         title: 'Wellness Tracking',
         type: 'item',
-        url: '/patient/wellbeing',
+        url: '/patient/wellness',
         icon: 'heart',
         breadcrumbs: false
       },
@@ -112,6 +120,31 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'book',
         breadcrumbs: false
       },
+      
+      {
+        id: 'care-plans',
+        title: 'Care Plans',
+        type: 'item',
+        url: '/patient/care-plans',
+        icon: 'heart',
+        breadcrumbs: false
+      },
+      {
+        id: 'prescriptions',
+        title: 'Prescriptions',
+        type: 'item',
+        url: '/patient/prescriptions',
+        icon: 'file-text',
+        breadcrumbs: false
+      },
+      {
+        id: 'pharmacy',
+        title: 'Locate Pharmacy/Clinic',
+        type: 'item',
+        url: '/patient/pharmacy',
+        icon: 'shop',
+        breadcrumbs: false
+      },
       {
         id: 'alerts',
         title: 'Alerts',
@@ -119,6 +152,30 @@ export const NavigationItems: NavigationItem[] = [
         url: '/patient/alerts',
         icon: 'bell',
         breadcrumbs: false
+      },
+      {
+        id: 'assurance',
+        title: 'Assurance',
+        type: 'item',
+        url: '/patient/assurance',
+        icon: 'bell',
+        breadcrumbs: false
+      }
+    ]
+  },
+  {
+    id: 'reports',
+    title: 'Reports',
+    type: 'group',
+    icon: 'file-pdf',  // Ant Design file-pdf icon
+    children: [
+       {
+        id: 'generate-reports',
+        title: 'Forums',
+        type: 'item',
+        url: '/patient/forum', // Path to generate reports
+        classes: 'nav-item',
+        icon: 'file-text', // Ant Design file-text icon
       }
     ]
   }

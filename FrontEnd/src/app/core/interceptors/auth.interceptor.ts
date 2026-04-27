@@ -1,17 +1,48 @@
-import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpEvent } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { AuthService } from '../services/auth.service'; // adjust path
 
-export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn): Observable<HttpEvent<unknown>> => {
-    const token = localStorage.getItem('alzguard_token');
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private auth: AuthService) {}
 
-    if (token) {
-        const cloned = req.clone({
-            setHeaders: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-        return next(cloned);
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const isPublicAuthRequest = req.url.includes('/auth/login') || req.url.includes('/auth/register');
+
+    if (isPublicAuthRequest) {
+      return next.handle(req);
     }
 
-    return next(req);
-};
+    const token = this.auth.getToken(); // reads from localStorage
+
+    if (token) {
+      try {
+        // Decode to extract role and userId for logging
+        const payloadPart = token.split('.')[1];
+        const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+        const payload = JSON.parse(atob(padded));
+
+        // Attach the token with Bearer scheme
+        req = req.clone({
+          setHeaders: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        console.group(`[AuthInterceptor] Request: ${req.method} ${req.url.replace(/.*\/\/[^\/]+/, '')}`);
+        console.log('Role:', payload.role);
+        console.log('UserId:', payload.userId);
+        console.groupEnd();
+      } catch (e) {
+        // Token exists but is malformed - don't send it
+        console.error('[AuthInterceptor] Token decode failed, request will not be authorized:', e);
+      }
+    } else {
+      console.warn('[AuthInterceptor] No token found for request:', req.url);
+    }
+
+    return next.handle(req);
+  }
+}
