@@ -46,8 +46,8 @@ class UserServiceTest {
         req.setRole("ADMIN");
         req.setPassword("Password123");
 
-        when(userRepository.existsByUsername("john")).thenReturn(false);
-        when(userRepository.existsByEmail("john@test.com")).thenReturn(false);
+        when(userRepository.existsByUsernameIgnoreCase("john")).thenReturn(false);
+        when(userRepository.existsByEmailIgnoreCase("john@test.com")).thenReturn(false);
         when(passwordEncoder.encode("Password123")).thenReturn("hashed");
         when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
@@ -69,8 +69,8 @@ class UserServiceTest {
         req.setUsername("john");
         req.setEmail("john@test.com");
 
-        when(userRepository.existsByUsername("john")).thenReturn(false);
-        when(userRepository.existsByEmail("john@test.com")).thenReturn(true);
+        when(userRepository.existsByUsernameIgnoreCase("john")).thenReturn(false);
+        when(userRepository.existsByEmailIgnoreCase("john@test.com")).thenReturn(true);
 
         RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.createUser(req));
         assertEquals("Email already exists", ex.getMessage());
@@ -102,7 +102,7 @@ class UserServiceTest {
         user.setRole(Role.ADMIN);
         user.setTokenVersion(0L);
 
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameIgnoreCase("john")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123", "hashed")).thenReturn(true);
         when(jwtUtils.generateJwtToken("john", "ADMIN", 10L, 0L)).thenReturn("jwt-token");
 
