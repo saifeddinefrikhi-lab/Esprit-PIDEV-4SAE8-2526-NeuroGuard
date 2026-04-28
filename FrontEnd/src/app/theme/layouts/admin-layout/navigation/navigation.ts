@@ -131,6 +131,22 @@ export const NavigationItems: NavigationItem[] = [
         classes: 'nav-item',
         icon: 'bar-chart',
       },
+      {
+        id: 'admin-monitoring',
+        title: 'Patient Monitoring',
+        type: 'item',
+        url: '/admin/monitoring',
+        classes: 'nav-item',
+        icon: 'line-chart',
+      },
+      {
+        id: 'admin-wellbeing',
+        title: 'Wellbeing Dashboard',
+        type: 'item',
+        url: '/admin/wellbeing',
+        classes: 'nav-item',
+        icon: 'smile',
+      },
     ]
   },
   {

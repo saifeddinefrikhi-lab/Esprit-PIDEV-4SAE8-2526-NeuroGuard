@@ -84,12 +84,12 @@ export const NavigationItems: NavigationItem[] = [
     icon: 'heart', // Ant Design heart icon
     children: [
       {
-        id: 'patient-well-being',
-        title: 'Patient Well-being',
+        id: 'patient-monitoring',
+        title: 'Patient Monitoring',
         type: 'item',
         classes: 'nav-item',
-        url: '/caregiver/well-being', // Path to monitor patient well-being
-        icon: 'book', // Ant Design smile icon
+        url: '/caregiver/monitoring',
+        icon: 'line-chart',
       },
     ]
   },

@@ -126,7 +126,7 @@ export class MoodTrendComponent implements OnInit {
     loadMoodTrends() {
         const user = this.authService.currentUser;
         if (user) {
-            this.wellbeingService.getMoodTrends(user.id).subscribe({
+            this.wellbeingService.getMoodTrends(user.userId.toString()).subscribe({
                 next: (trends) => {
                     if (trends && trends.length > 0) {
                         const reversedTrends = [...trends].reverse();

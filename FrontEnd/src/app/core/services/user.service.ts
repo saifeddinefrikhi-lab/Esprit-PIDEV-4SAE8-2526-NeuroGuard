@@ -11,9 +11,17 @@ export class UserService {
     constructor(private http: HttpClient) { }
 
     /**
-     * Get all patients assigned to a specific caregiver
+     * Get patients assigned to the current caregiver based on medical history records
+     * (Used by other microservices/components)
      */
-    getCaregiverPatients(caregiverId: string): Observable<User[]> {
+    getCaregiverPatients(caregiverId?: string): Observable<User[]> {
+        return this.http.get<User[]>(`${environment.apiUrl}/api/caregiver/medical-history/patients`);
+    }
+
+    /**
+     * Get all patients assigned to a specific caregiver from the user database
+     */
+    getCaregiverPatientsFromUserTable(caregiverId: string): Observable<User[]> {
         return this.http.get<User[]>(`${this.apiUrl}/caregiver/${caregiverId}/patients`);
     }
 }

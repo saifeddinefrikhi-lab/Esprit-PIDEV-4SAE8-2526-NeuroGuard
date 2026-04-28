@@ -100,8 +100,16 @@ export const NavigationItems: NavigationItem[] = [
         id: 'wellness',
         title: 'Wellness Tracking',
         type: 'item',
-        url: '/patient/wellness',
+        url: '/patient/wellbeing',
         icon: 'heart',
+        breadcrumbs: false
+      },
+      {
+        id: 'monitoring',
+        title: 'My Health Monitoring',
+        type: 'item',
+        url: '/patient/monitoring',
+        icon: 'line-chart',
         breadcrumbs: false
       },
       {

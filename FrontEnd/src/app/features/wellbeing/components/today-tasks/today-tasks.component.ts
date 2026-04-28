@@ -25,7 +25,7 @@ export class TodayTasksComponent implements OnInit {
     loadTasks() {
         const user = this.authService.currentUser;
         if (user) {
-            this.monitoringService.getPatientTasks(user.id).subscribe({
+            this.monitoringService.getPatientTasks(user.userId.toString()).subscribe({
                 next: (tasks) => {
                     const today = new Date();
                     const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;

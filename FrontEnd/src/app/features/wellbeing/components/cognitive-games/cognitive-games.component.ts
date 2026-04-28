@@ -61,9 +61,9 @@ export class CognitiveGamesComponent implements OnInit, OnDestroy {
     }
 
     loadLastScores() {
-        const userId = this.authService.currentUser?.id;
+        const userId = this.authService.currentUser?.userId;
         if (userId) {
-            this.wellbeingService.getGameResults(userId).subscribe(results => {
+            this.wellbeingService.getGameResults(userId.toString()).subscribe(results => {
                 this.games.forEach(game => {
                     const gameResults = results.filter(r => r.gameType === game.id);
                     if (gameResults.length > 0) {
@@ -240,10 +240,10 @@ export class CognitiveGamesComponent implements OnInit, OnDestroy {
         
         const timeSpent = Math.round((Date.now() - this.gameStartTime) / 1000);
 
-        const userId = this.authService.currentUser?.id;
+        const userId = this.authService.currentUser?.userId;
         if (userId) {
             this.wellbeingService.saveGameResult({
-                patientId: userId,
+                patientId: userId.toString(),
                 gameType: this.activeGameId,
                 score: this.gameScore,
                 timeSpentSeconds: timeSpent

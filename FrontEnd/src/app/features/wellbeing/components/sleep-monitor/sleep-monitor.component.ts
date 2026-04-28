@@ -107,7 +107,7 @@ export class SleepMonitorComponent implements OnInit {
     loadSleepData() {
         const user = this.authService.currentUser;
         if (user) {
-            this.monitoringService.getLatestSleep(user.id).subscribe({
+            this.monitoringService.getLatestSleep(user.userId.toString()).subscribe({
                 next: (latestSleep) => {
                     if (latestSleep) {
                         const duration = (latestSleep as any).duration || latestSleep.hours || 0;

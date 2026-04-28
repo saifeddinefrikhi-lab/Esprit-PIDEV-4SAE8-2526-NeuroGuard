@@ -31,7 +31,7 @@ export class MonitoringTasksComponent implements OnInit {
     loadTasks() {
         const user = this.authService.currentUser;
         if (user) {
-            this.monitoringService.getCaregiverTasks(user.id).subscribe({
+            this.monitoringService.getCaregiverTasks(user.userId.toString()).subscribe({
                 next: (tasks) => this.tasks = tasks,
                 error: (err) => {
                     console.error('Error fetching caregiver tasks', err);
@@ -71,7 +71,7 @@ export class MonitoringTasksComponent implements OnInit {
             icon: 'assignment' // Default icon for manual tasks
         };
 
-        this.monitoringService.createCaregiverTask(user.id, newTask).subscribe({
+        this.monitoringService.createCaregiverTask(user.userId.toString(), newTask).subscribe({
             next: (created) => {
                 this.tasks.push(created);
                 this.newTaskText = '';

@@ -32,13 +32,13 @@ export class PatientListComponent implements OnInit {
         }
 
         this.caregiverName = user.name;
-        this.loadPatients(user.id);
+        this.loadPatients(user.userId.toString());
     }
 
     loadPatients(caregiverId: string) {
         this.loading = true;
         this.error = '';
-        this.userService.getCaregiverPatients(caregiverId).subscribe({
+        this.userService.getCaregiverPatientsFromUserTable(caregiverId).subscribe({
             next: (patients) => {
                 this.patients = patients;
                 this.loading = false;

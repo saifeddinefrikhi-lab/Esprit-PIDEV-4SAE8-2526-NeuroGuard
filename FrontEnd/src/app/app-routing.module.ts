@@ -106,6 +106,14 @@ export const routes: Routes = [
         path: 'admin/assurance',
         loadComponent: () => import('./Back-office/pages/assurance-admin/assurance-admin.component').then((c) => c.AssuranceAdminComponent)
       },
+      {
+        path: 'admin/monitoring',
+        loadChildren: () => import('./features/monitoring/monitoring.module').then(m => m.MonitoringModule)
+      },
+      {
+        path: 'admin/wellbeing',
+        loadChildren: () => import('./features/wellbeing/wellbeing.module').then(m => m.WellbeingModule)
+      },
     ]
   },
 
@@ -183,8 +191,15 @@ export const routes: Routes = [
         path: 'patient/medication',
         redirectTo: 'patient/prescriptions',
         pathMatch: 'full'
+      },
+      {
+        path: 'patient/monitoring',
+        loadChildren: () => import('./features/monitoring/monitoring.module').then(m => m.MonitoringModule)
+      },
+      {
+        path: 'patient/wellbeing',
+        loadChildren: () => import('./features/wellbeing/wellbeing.module').then(m => m.WellbeingModule)
       }
-
     ]
   },
 
@@ -245,6 +260,14 @@ export const routes: Routes = [
       {
         path: 'caregiver/consultations',
         loadComponent: () => import('./Front-office/caregiver/caregiver-consultations/caregiver-consultations.component').then((c) => c.CaregiverConsultationsComponent)
+      },
+      {
+        path: 'caregiver/monitoring',
+        loadChildren: () => import('./features/monitoring/monitoring.module').then(m => m.MonitoringModule)
+      },
+      {
+        path: 'caregiver/wellbeing',
+        loadChildren: () => import('./features/wellbeing/wellbeing.module').then(m => m.WellbeingModule)
       }
     ]
   },

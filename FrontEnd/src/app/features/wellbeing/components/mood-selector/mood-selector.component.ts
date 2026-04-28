@@ -35,7 +35,7 @@ export class MoodSelectorComponent implements OnInit {
     loadLatestMood() {
         const user = this.authService.currentUser;
         if (user) {
-            this.wellbeingService.getLatestMood(user.id).subscribe({
+            this.wellbeingService.getLatestMood(user.userId.toString()).subscribe({
                 next: (mood) => {
                     if (mood) {
                         this.selectedMood = mood.moodLabel;
@@ -60,7 +60,7 @@ export class MoodSelectorComponent implements OnInit {
         if (user) {
             this.isProcessing = true;
             this.wellbeingService.saveMood({
-                userId: user.id,
+                userId: user.userId.toString(),
                 moodLabel: mood.label,
                 emoji: mood.emoji
             }).subscribe({

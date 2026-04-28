@@ -41,8 +41,8 @@ export class WellbeingDashboardComponent implements OnInit {
         const user = this.authService.currentUser;
         if (user) {
             forkJoin({
-                pulse: this.wellbeingService.getPatientPulse(user.id),
-                sleep: this.monitoringService.getLatestSleep(user.id).pipe(catchError(() => of(null)))
+                pulse: this.wellbeingService.getPatientPulse(user.userId.toString()),
+                sleep: this.monitoringService.getLatestSleep(user.userId.toString()).pipe(catchError(() => of(null)))
             }).subscribe({
                 next: (results) => {
                     const data = results.pulse;

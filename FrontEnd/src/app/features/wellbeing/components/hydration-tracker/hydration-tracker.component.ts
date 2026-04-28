@@ -26,7 +26,7 @@ export class HydrationTrackerComponent implements OnInit {
     loadInitialHydration() {
         const user = this.authService.currentUser;
         if (user) {
-            this.wellbeingService.getTodayHydration(user.id).subscribe({
+            this.wellbeingService.getTodayHydration(user.userId.toString()).subscribe({
                 next: (res) => {
                     this.currentGlasses = res.glassesCount;
                     this.targetGlasses = res.targetGlasses;
@@ -53,7 +53,7 @@ export class HydrationTrackerComponent implements OnInit {
         const user = this.authService.currentUser;
         if (user) {
             this.isProcessing = true;
-            this.wellbeingService.addHydration(user.id).subscribe({
+            this.wellbeingService.addHydration(user.userId.toString()).subscribe({
                 next: (res) => {
                     this.currentGlasses = res.glassesCount;
                     this.targetGlasses = res.targetGlasses;
@@ -74,7 +74,7 @@ export class HydrationTrackerComponent implements OnInit {
         const user = this.authService.currentUser;
         if (user && !this.isProcessing) {
             this.isProcessing = true;
-            this.wellbeingService.resetHydration(user.id).subscribe({
+            this.wellbeingService.resetHydration(user.userId.toString()).subscribe({
                 next: (res) => {
                     this.currentGlasses = res.glassesCount;
                     this.isProcessing = false;
