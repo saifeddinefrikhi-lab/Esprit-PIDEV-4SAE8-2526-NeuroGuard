@@ -11,4 +11,6 @@ export interface UserDto {
   longitude?: number;
   latitude?: number;
   altitude?: number;
+  gender?: string;
+  age?: number;
 }

@@ -158,6 +158,10 @@ spring:
           uri: lb://wellbeing-service
           predicates:
             - Path=/api/wellbeing/**
+        - id: product-order-service
+          uri: lb://product-order-service
+          predicates:
+            - Path=/products/**, /orders/**, /deliveries/**
 
 
 logging:

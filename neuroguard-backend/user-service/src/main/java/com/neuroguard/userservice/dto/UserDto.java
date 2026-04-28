@@ -16,6 +16,8 @@ public class UserDto {
     private String status;
     private boolean isConnected;
     private LocalDateTime bannedUntil;
+    private String gender;
+    private Integer age;
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -53,4 +55,10 @@ public class UserDto {
 
     public LocalDateTime getBannedUntil() { return bannedUntil; }
     public void setBannedUntil(LocalDateTime bannedUntil) { this.bannedUntil = bannedUntil; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
+    public Integer getAge() { return age; }
+    public void setAge(Integer age) { this.age = age; }
 }

@@ -3,7 +3,7 @@ spring:
     name: product-order-service
   datasource:
     # Default MySQL port is 3306. Use 3308 only if your server listens on 3308.
-    url: jdbc:mysql://localhost:3308/produitdb?createDatabaseIfNotExist=true
+    url: jdbc:mysql://localhost:3306/produitdb?createDatabaseIfNotExist=true
     username: root
     password:
   jpa:
