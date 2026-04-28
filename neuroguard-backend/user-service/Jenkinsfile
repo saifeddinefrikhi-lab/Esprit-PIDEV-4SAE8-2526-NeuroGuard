@@ -25,6 +25,7 @@ pipeline {
                     sh "mvn clean test -B"
                 }
             }
+        }
         stage('Build ') {
             steps {
                 dir("${SERVICE_DIR}") {
