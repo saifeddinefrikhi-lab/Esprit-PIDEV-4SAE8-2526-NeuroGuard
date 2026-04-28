@@ -10,7 +10,7 @@ pipeline {
         DOCKER_IMAGE = "neuroguard/user-service"
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
         SERVICE_DIR  = "neuroguard-backend/user-service"
-        
+        MAVEN_OPTS   = "-Xmx1024m"
     }
     options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
@@ -66,7 +66,6 @@ pipeline {
                 }
             }
         }
-}
     }
     post { always { cleanWs() } }
 }
