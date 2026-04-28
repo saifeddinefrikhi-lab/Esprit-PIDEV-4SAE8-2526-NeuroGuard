@@ -1,17 +1,16 @@
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import { AlertService } from 'src/app/core/services/alert.service';
-import { MedicalHistoryService } from 'src/app/core/services/medical-history.service';
-import { AlertResponse } from 'src/app/core/models/alert.model';
-import { MedicalHistoryResponse } from 'src/app/core/models/medical-history.model';
-import { UserDto } from 'src/app/core/models/user.dto';
-
+import { StatisticsService, CaregiverStatisticsDTO } from 'src/app/core/services/statistics.service';
 import { IconService, IconDirective } from '@ant-design/icons-angular';
 import { RiseOutline, FallOutline } from '@ant-design/icons-angular/icons';
 import { CardComponent } from 'src/app/theme/shared/components/card/card.component';
+import { AlertTrendsChartComponent } from 'src/app/theme/shared/apexchart/alert-trends-chart/alert-trends-chart.component';
+import { ProgressionChartComponent } from 'src/app/theme/shared/apexchart/progression-chart/progression-chart.component';
+import { HealthRiskChartComponent } from 'src/app/theme/shared/apexchart/health-risk-chart/health-risk-chart.component';
+import { CognitiveAssessmentChartComponent } from 'src/app/theme/shared/apexchart/cognitive-assessment-chart/cognitive-assessment-chart.component';
 
 interface ChartPoint {
   label: string;
@@ -20,16 +19,28 @@ interface ChartPoint {
   colorClass: string;
 }
 
+/**
+ * Refactored Caregiver Home Component
+ * Uses backend statistics service instead of client-side aggregation
+ * Single API call to get aggregated statistics with table joins
+ */
 @Component({
   selector: 'app-home',
-  imports: [CommonModule, CardComponent, IconDirective],
+  imports: [
+    CommonModule,
+    CardComponent,
+    IconDirective,
+    AlertTrendsChartComponent,
+    ProgressionChartComponent,
+    HealthRiskChartComponent,
+    CognitiveAssessmentChartComponent
+  ],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit {
   private iconService = inject(IconService);
-  private alertService = inject(AlertService);
-  private medicalHistoryService = inject(MedicalHistoryService);
+  private statisticsService = inject(StatisticsService);
   private cdr = inject(ChangeDetectorRef);
 
   constructor() {
@@ -37,6 +48,20 @@ export class HomeComponent implements OnInit {
   }
 
   loadingStats = true;
+
+  // Chart data properties
+  criticalAlertsCount: number = 0;
+  warningAlertsCount: number = 0;
+  infoAlertsCount: number = 0;
+  mildCasesCount: number = 0;
+  moderateCasesCount: number = 0;
+  severeCasesCount: number = 0;
+
+  // New chart data properties
+  averageMMSE: number = 0;
+  averageFunctionalAssessment: number = 0;
+  averageADL: number = 0;
+  patientsWithHighRisk: number = 0;
 
   AnalyticEcommerce = [
     { title: 'Assigned Patients', amount: '0', background: 'bg-light-primary', border: 'border-primary', icon: 'rise', percentage: '0%', color: 'text-primary', number: 'Under follow-up', note: 'Patients assigned to caregiver' },
@@ -48,101 +73,152 @@ export class HomeComponent implements OnInit {
   severityChart: ChartPoint[] = [];
   statusChart: ChartPoint[] = [];
   progressionChart: ChartPoint[] = [];
-  latestRiskAlerts: AlertResponse[] = [];
+  latestRiskAlerts: any[] = [];
 
   ngOnInit(): void {
     setTimeout(() => this.loadStatistics());
   }
 
+  /**
+   * Load statistics from backend (single API call)
+   * Backend aggregates all data including assigned patients and their alerts
+   */
   private loadStatistics(): void {
     this.loadingStats = true;
 
-    forkJoin({
-      assignedPatients: this.medicalHistoryService.getAssignedPatients().pipe(catchError(() => of([] as UserDto[]))),
-      alerts: this.alertService.getCaregiverAlerts().pipe(catchError(() => of([] as AlertResponse[])))
-    }).subscribe(({ assignedPatients, alerts }) => {
-      const historyRequests = assignedPatients.map(patient =>
-        this.medicalHistoryService.getPatientHistoryForCaregiver(patient.id)
-          .pipe(catchError(() => of(null as unknown as MedicalHistoryResponse)))
-      );
-
-      if (historyRequests.length === 0) {
-        setTimeout(() => {
-          this.updateCaregiverStats(assignedPatients, [], alerts);
+    // Single API call to get all caregiver statistics
+    this.statisticsService.getMyCaregiverStatistics()
+      .pipe(
+        catchError(error => {
+          console.error('Failed to load caregiver statistics:', error);
           this.loadingStats = false;
           this.cdr.detectChanges();
-        });
-        return;
-      }
-
-      forkJoin(historyRequests).subscribe((histories) => {
-        setTimeout(() => {
-          const validHistories = histories.filter((history): history is MedicalHistoryResponse => history !== null);
-          this.updateCaregiverStats(assignedPatients, validHistories, alerts);
-          this.loadingStats = false;
-          this.cdr.detectChanges();
-        });
+          return of(null);
+        })
+      )
+      .subscribe(statistics => {
+        if (statistics) {
+          setTimeout(() => {
+            this.updateCaregiverStats(statistics);
+            this.loadingStats = false;
+            this.cdr.detectChanges();
+          });
+        }
       });
-    });
   }
 
-  private updateCaregiverStats(
-    assignedPatients: UserDto[],
-    histories: MedicalHistoryResponse[],
-    alerts: AlertResponse[]
-  ): void {
-    const assignedCount = assignedPatients.length;
-    const historyCount = histories.length;
+  /**
+   * Update UI with statistics from backend
+   * All aggregations and joins were performed on backend
+   */
+  private updateCaregiverStats(stats: CaregiverStatisticsDTO): void {
+    const historyCoverage = Math.round(stats.historyCoverage);
+    const pendingRate = this.calculatePercent(stats.pendingAlerts, stats.totalAlerts);
+    const criticalRate = this.calculatePercent(stats.criticalAlerts, stats.totalAlerts);
 
-    const unresolvedAlerts = alerts.filter(alert => !alert.resolved);
-    const pendingAlerts = unresolvedAlerts.length;
-    const criticalAlerts = unresolvedAlerts.filter(alert => (alert.severity || '').toUpperCase() === 'CRITICAL').length;
-
-    const historyCoverage = this.toPercent(historyCount, assignedCount);
-    const pendingRate = this.toPercent(pendingAlerts, alerts.length);
-    const criticalRate = this.toPercent(criticalAlerts, alerts.length);
+    // Set chart data from backend statistics
+    this.criticalAlertsCount = stats.criticalAlerts;
+    this.warningAlertsCount = stats.warningAlerts;
+    this.infoAlertsCount = stats.infoAlerts;
+    this.mildCasesCount = stats.mildCases;
+    this.moderateCasesCount = stats.moderateCases;
+    this.severeCasesCount = stats.severeCases;
+    this.averageMMSE = stats.averageMMSE;
+    this.averageFunctionalAssessment = stats.averageFunctionalAssessment;
+    this.averageADL = stats.averageADL;
+    this.patientsWithHighRisk = stats.patientsWithLowMMSE + stats.patientsWithCognitiveDifficultyOptions;
 
     this.AnalyticEcommerce = [
-      { title: 'Assigned Patients', amount: String(assignedCount), background: 'bg-light-primary', border: 'border-primary', icon: 'rise', percentage: '100%', color: 'text-primary', number: 'Under follow-up', note: 'Patients assigned to caregiver' },
-      { title: 'Medical Histories Available', amount: String(historyCount), background: 'bg-light-success', border: 'border-success', icon: 'rise', percentage: `${historyCoverage}%`, color: 'text-success', number: 'Coverage of assigned patients', note: 'Medical histories currently visible' },
-      { title: 'Pending Risk Alerts', amount: String(pendingAlerts), background: 'bg-light-warning', border: 'border-warning', icon: 'fall', percentage: `${pendingRate}%`, color: 'text-warning', number: 'Unresolved alerts', note: 'Alerts requiring caregiver action' },
-      { title: 'Critical Risk Alerts', amount: String(criticalAlerts), background: 'bg-light-danger', border: 'border-danger', icon: 'fall', percentage: `${criticalRate}%`, color: 'text-danger', number: 'Critical unresolved alerts', note: 'Highest urgency patient risks' }
+      {
+        title: 'Assigned Patients',
+        amount: String(stats.totalAssignedPatients),
+        background: 'bg-light-primary',
+        border: 'border-primary',
+        icon: 'rise',
+        percentage: '100%',
+        color: 'text-primary',
+        number: 'Under follow-up',
+        note: 'Patients assigned to caregiver'
+      },
+      {
+        title: 'Medical Histories Available',
+        amount: String(stats.patientsWithMedicalHistory),
+        background: 'bg-light-success',
+        border: 'border-success',
+        icon: 'rise',
+        percentage: `${historyCoverage}%`,
+        color: 'text-success',
+        number: 'Coverage of assigned patients',
+        note: 'Medical histories currently visible'
+      },
+      {
+        title: 'Pending Risk Alerts',
+        amount: String(stats.pendingAlerts),
+        background: 'bg-light-warning',
+        border: 'border-warning',
+        icon: 'fall',
+        percentage: `${pendingRate}%`,
+        color: 'text-warning',
+        number: 'Unresolved alerts',
+        note: 'Alerts requiring caregiver action'
+      },
+      {
+        title: 'Critical Risk Alerts',
+        amount: String(stats.criticalAlerts),
+        background: 'bg-light-danger',
+        border: 'border-danger',
+        icon: 'fall',
+        percentage: `${criticalRate}%`,
+        color: 'text-danger',
+        number: 'Critical unresolved alerts',
+        note: 'Highest urgency patient risks'
+      },
+      // New cards
+      {
+        title: 'High-Risk Patients',
+        amount: String(this.patientsWithHighRisk),
+        background: 'bg-light-danger',
+        border: 'border-danger',
+        icon: 'fall',
+        percentage: `${this.calculatePercent(this.patientsWithHighRisk, stats.totalAssignedPatients)}%`,
+        color: 'text-danger',
+        number: 'Low MMSE or cognitive difficulty',
+        note: 'Patients requiring immediate attention'
+      },
+      {
+        title: 'Unresolved Critical',
+        amount: String(stats.unresolvedCriticalAlerts),
+        background: 'bg-light-danger',
+        border: 'border-danger',
+        icon: 'fall',
+        percentage: `${stats.criticalAlertRate.toFixed(1)}%`,
+        color: 'text-danger',
+        number: 'Critical alert rate',
+        note: 'Percentage of unresolved critical alerts'
+      },
+      {
+        title: 'Alert Resolution',
+        amount: `${stats.alertResolutionRate.toFixed(1)}%`,
+        background: 'bg-light-success',
+        border: 'border-success',
+        icon: 'rise',
+        percentage: `${stats.resolvedAlerts}/${stats.totalAlerts}`,
+        color: 'text-success',
+        number: 'Alerts resolved',
+        note: 'Alert resolution effectiveness'
+      },
+      {
+        title: 'Patient Health Status',
+        amount: String(stats.mildCases),
+        background: 'bg-light-info',
+        border: 'border-info',
+        icon: 'rise',
+        percentage: `${this.calculatePercent(stats.mildCases, stats.totalAssignedPatients)}%`,
+        color: 'text-info',
+        number: 'Mild progression',
+        note: 'Patients with mild progression status'
+      }
     ];
-
-    const criticalCount = alerts.filter(alert => (alert.severity || '').toUpperCase() === 'CRITICAL').length;
-    const warningCount = alerts.filter(alert => (alert.severity || '').toUpperCase() === 'WARNING').length;
-    const infoCount = alerts.filter(alert => (alert.severity || '').toUpperCase() === 'INFO').length;
-
-    this.severityChart = this.buildChart([
-      { label: 'Critical', value: criticalCount, colorClass: 'bg-danger' },
-      { label: 'Warning', value: warningCount, colorClass: 'bg-warning' },
-      { label: 'Info', value: infoCount, colorClass: 'bg-info' }
-    ]);
-
-    const resolvedCount = alerts.filter(alert => alert.resolved).length;
-    this.statusChart = this.buildChart([
-      { label: 'Pending', value: pendingAlerts, colorClass: 'bg-warning' },
-      { label: 'Resolved', value: resolvedCount, colorClass: 'bg-success' }
-    ]);
-
-    const mildCount = histories.filter(history => (history.progressionStage || '').toUpperCase() === 'MILD').length;
-    const moderateCount = histories.filter(history => (history.progressionStage || '').toUpperCase() === 'MODERATE').length;
-    const severeCount = histories.filter(history => (history.progressionStage || '').toUpperCase() === 'SEVERE').length;
-    this.progressionChart = this.buildChart([
-      { label: 'Mild', value: mildCount, colorClass: 'bg-primary' },
-      { label: 'Moderate', value: moderateCount, colorClass: 'bg-warning' },
-      { label: 'Severe', value: severeCount, colorClass: 'bg-danger' }
-    ]);
-
-    this.latestRiskAlerts = unresolvedAlerts
-      .sort((firstAlert, secondAlert) => {
-        const severityDiff = this.severityWeight(secondAlert.severity) - this.severityWeight(firstAlert.severity);
-        if (severityDiff !== 0) {
-          return severityDiff;
-        }
-        return new Date(secondAlert.createdAt).getTime() - new Date(firstAlert.createdAt).getTime();
-      })
-      .slice(0, 5);
   }
 
   private buildChart(series: Array<{ label: string; value: number; colorClass: string }>): ChartPoint[] {
@@ -153,12 +229,7 @@ export class HomeComponent implements OnInit {
     }));
   }
 
-  private severityWeight(severity: string): number {
-    const mappedSeverity: Record<string, number> = { CRITICAL: 3, WARNING: 2, INFO: 1 };
-    return mappedSeverity[(severity || '').toUpperCase()] || 0;
-  }
-
-  private toPercent(value: number, total: number): number {
+  private calculatePercent(value: number, total: number): number {
     return total > 0 ? Math.round((value / total) * 100) : 0;
   }
 }

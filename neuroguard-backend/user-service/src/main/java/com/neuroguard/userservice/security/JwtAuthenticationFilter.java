@@ -1,11 +1,16 @@
 package com.neuroguard.userservice.security;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.neuroguard.userservice.entities.User;
+import com.neuroguard.userservice.entities.UserStatus;
+import com.neuroguard.userservice.repositories.UserRepository;
+import com.neuroguard.userservice.services.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,12 +20,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final UserRepository userRepository;
+
+    @Autowired
+    private UserService userService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -34,24 +44,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        // Check if token has been invalidated (logged out)
-        if (jwtUtils.isTokenInvalidated(token)) {
+        if (jwtUtils.isTokenInvalidated(token) || !jwtUtils.validateJwtToken(token)) {
             chain.doFilter(request, response);
             return;
         }
 
-        if (!jwtUtils.validateJwtToken(token)) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        // Extract claims
         DecodedJWT decodedJWT = jwtUtils.verifyToken(token);
         String username = decodedJWT.getSubject();
         String role = decodedJWT.getClaim("role").asString();
         Long userId = decodedJWT.getClaim("userId").asLong();
+        Long tokenVersion = decodedJWT.getClaim("tokenVersion").asLong();
 
-        // Create authentication token
+        // Ban check: validate tokenVersion and account status
+        Optional<User> userOpt = userRepository.findByUsernameIgnoreCase(username);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.getStatus() == UserStatus.BANNED || user.getStatus() == UserStatus.DISABLED) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Account is banned or disabled\"}");
+                return;
+            }
+            if (tokenVersion == null || tokenVersion < user.getTokenVersion()) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Session invalidated. Please log in again.\"}");
+                return;
+            }
+        }
+
         UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                 username,
                 null,
@@ -59,12 +80,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         );
         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-        // Store userId in request attribute if needed
         request.setAttribute("userId", userId);
         request.setAttribute("userRole", role);
 
         SecurityContextHolder.getContext().setAuthentication(authToken);
+
+        if (userService != null) {
+            userService.updateLastSeen(username);
+        }
+
         chain.doFilter(request, response);
     }
-
 }

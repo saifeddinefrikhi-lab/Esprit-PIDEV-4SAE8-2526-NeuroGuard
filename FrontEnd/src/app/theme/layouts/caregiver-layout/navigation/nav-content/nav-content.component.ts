@@ -22,13 +22,9 @@ import {
   BgColorsOutline,
   AntDesignOutline,
   HomeOutline,
-  UserOutline,
-  UserAddOutline,
-  TeamOutline,
   ScheduleOutline,
   CalendarOutline,
-  PlusCircleOutline,
-  ExperimentOutline,
+  AlertOutline,
   BellOutline,
   HeartOutline,
   BookOutline,
@@ -74,13 +70,9 @@ export class NavContentComponent implements OnInit {
         ChromeOutline,
         QuestionOutline,
         HomeOutline,
-        UserOutline,
-        UserAddOutline,
-        TeamOutline,
         ScheduleOutline,
         CalendarOutline,
-        PlusCircleOutline,
-        ExperimentOutline,
+        AlertOutline,
         BellOutline,
         HeartOutline,
         BookOutline,
@@ -123,11 +115,9 @@ export class NavContentComponent implements OnInit {
   }
 
   navMob() {
-    if (this.windowWidth < 1025) {
-      const navbar = document.querySelector('app-navigation.coded-navbar');
-      if (navbar && navbar.classList.contains('mob-open')) {
-        this.NavCollapsedMob.emit();
-      }
+    const navElement = document.querySelector('app-navigation.coded-navbar');
+    if (this.windowWidth < 1025 && navElement !== null && navElement.classList.contains('mob-open')) {
+      this.NavCollapsedMob.emit();
     }
   }
 }

@@ -1,10 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ForumService } from '../../core/services/forum.service';
-import { CreatePostRequest, UpdatePostRequest } from '../../core/models/post.dto';
+import { CreatePostRequest, UpdatePostRequest, CategoryDto, DEFAULT_FORUM_CATEGORIES } from '../../core/models/post.dto';
+import { PostDto } from '../../core/models/post.dto';
 import { AuthService } from '../../core/services/auth.service';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-post-form',
@@ -13,60 +15,41 @@ import { AuthService } from '../../core/services/auth.service';
   templateUrl: './post-form.component.html',
   styleUrls: ['./post-form.component.scss']
 })
-export class PostFormComponent implements OnInit {
+export class PostFormComponent implements OnInit, OnDestroy {
   postForm: FormGroup;
+  categories: CategoryDto[] = [];
   isEdit = false;
   postId?: number;
+  /** Set after create or when editing; used for image list and upload */
+  currentPost: PostDto | null = null;
+  /** True after creating a new post (stay on form to add images) */
+  createdJustNow = false;
   loading = false;
-  errorMessage = '';
-  successMessage = '';
-  submitted = false;
-  fieldErrors: { [key: string]: string } = {};
-
-  // Validation constants
-  readonly TITLE_MIN_LENGTH = 3;
-  readonly TITLE_MAX_LENGTH = 200;
-  readonly CONTENT_MIN_LENGTH = 10;
-  readonly CONTENT_MAX_LENGTH = 5000;
+  error = '';
+  uploadingImages = false;
+  imageUploadError = '';
+  /** Files selected on new post form (uploaded after create) */
+  pendingImageFiles: File[] = [];
+  /** Object URLs for preview; revoke in removePendingImage and on destroy */
+  pendingPreviewUrls: string[] = [];
 
   constructor(
     private fb: FormBuilder,
     private route: ActivatedRoute,
     private router: Router,
-    private forumService: ForumService,
-    private authService: AuthService
+    public forumService: ForumService,
+    private authService: AuthService,
+    private cdr: ChangeDetectorRef
   ) {
     this.postForm = this.fb.group({
-      title: ['', [
-        Validators.required,
-        Validators.minLength(this.TITLE_MIN_LENGTH),
-        Validators.maxLength(this.TITLE_MAX_LENGTH),
-        this.noWhitespaceValidator
-      ]],
-      content: ['', [
-        Validators.required,
-        Validators.minLength(this.CONTENT_MIN_LENGTH),
-        Validators.maxLength(this.CONTENT_MAX_LENGTH),
-        this.noWhitespaceValidator
-      ]]
+      title: ['', [Validators.required, Validators.minLength(3)]],
+      content: ['', [Validators.required, Validators.minLength(10)]],
+      categoryId: [null as number | null]
     });
   }
 
-  // Custom validator to prevent only whitespace
-  private noWhitespaceValidator(control: AbstractControl): ValidationErrors | null {
-    if (!control.value) {
-      return null;
-    }
-    const isWhitespace = (control.value || '').trim().length === 0;
-    return isWhitespace ? { whitespace: true } : null;
-  }
-
-  // Getter for easy access to form fields
-  get f() {
-    return this.postForm.controls;
-  }
-
   ngOnInit(): void {
+    this.loadCategories();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEdit = true;
@@ -75,75 +58,199 @@ export class PostFormComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.revokePendingPreviews();
+  }
+
+  loadCategories(): void {
+    this.forumService.getCategories().subscribe({
+      next: (list) => {
+        this.categories = list?.length ? list : DEFAULT_FORUM_CATEGORIES;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.categories = DEFAULT_FORUM_CATEGORIES;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   loadPost(): void {
     this.loading = true;
-    this.forumService.getPostById(this.postId!).subscribe({
+    this.error = '';
+    this.forumService.getPostById(this.postId!).pipe(
+      finalize(() => {
+        setTimeout(() => {
+          this.loading = false;
+          this.cdr.detectChanges();
+        }, 0);
+      })
+    ).subscribe({
       next: (post) => {
+        this.currentPost = post;
         this.postForm.patchValue({
           title: post.title,
-          content: post.content
+          content: post.content,
+          categoryId: post.categoryId ?? null
         });
-        this.loading = false;
       },
-      error: (err) => {
-        this.errorMessage = 'Failed to load post.';
-        this.loading = false;
+      error: () => {
+        this.error = 'Failed to load post.';
       }
     });
   }
 
   onSubmit(): void {
-    this.submitted = true;
-    this.errorMessage = '';
-    this.successMessage = '';
-    this.fieldErrors = {};
-    
-    // Mark all fields as touched to show validation errors
-    Object.keys(this.postForm.controls).forEach(key => {
-      this.postForm.get(key)?.markAsTouched();
-    });
-
-    if (this.postForm.invalid) {
-      this.errorMessage = 'Please correct the errors in the form before submitting.';
-      this.scrollToError();
-      return;
-    }
+    if (this.postForm.invalid) return;
 
     this.loading = true;
-    
-    // Trim whitespace from values
+    this.error = '';
+    const raw = this.postForm.value;
     const request = {
-      title: this.postForm.value.title.trim(),
-      content: this.postForm.value.content.trim()
+      ...raw,
+      categoryId: raw.categoryId || undefined
+    };
+
+    const clearLoading = () => {
+      setTimeout(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      }, 0);
     };
 
     if (this.isEdit) {
       this.forumService.updatePost(this.postId!, request as UpdatePostRequest).subscribe({
-        next: () => this.router.navigate([this.getForumBasePath(), this.postId]),
+        next: () => {
+          clearLoading();
+          this.router.navigate([this.getForumBasePath(), this.postId]);
+        },
         error: (err) => {
-          this.handleServerError(err);
-          this.loading = false;
+          this.error = (err.error && typeof err.error === 'string') ? err.error : 'Failed to update post.';
+          clearLoading();
         }
       });
     } else {
       this.forumService.createPost(request as CreatePostRequest).subscribe({
-        next: (post) => this.router.navigate([this.getForumBasePath(), post.id]),
+        next: (post) => {
+          this.postId = post.id;
+          this.currentPost = { ...post, imageUrls: post.imageUrls ?? [], imageIds: post.imageIds ?? [] };
+          this.isEdit = true;
+          if (this.pendingImageFiles.length > 0) {
+            this.loading = false;
+            this.uploadingImages = true;
+            this.cdr.markForCheck();
+            this.forumService.uploadPostImages(post.id, this.pendingImageFiles).subscribe({
+              next: () => {
+                this.pendingImageFiles = [];
+                this.revokePendingPreviews();
+                this.uploadingImages = false;
+                this.forumService.getPostById(post.id).subscribe({
+                  next: (updated) => {
+                    this.currentPost = updated;
+                    this.createdJustNow = true;
+                    this.cdr.markForCheck();
+                  }
+                });
+              },
+              error: (err) => {
+                this.uploadingImages = false;
+                this.imageUploadError = err?.error?.message || err?.error || 'Some images failed to upload.';
+                this.createdJustNow = true;
+                this.forumService.getPostById(post.id).subscribe({
+                  next: (updated) => { this.currentPost = updated; this.cdr.markForCheck(); }
+                });
+                clearLoading();
+              }
+            });
+          } else {
+            this.createdJustNow = true;
+            clearLoading();
+            this.cdr.markForCheck();
+          }
+        },
         error: (err) => {
-          this.handleServerError(err);
-          this.loading = false;
+          this.error = (err.error && typeof err.error === 'string') ? err.error : 'Failed to create post.';
+          clearLoading();
         }
       });
     }
   }
 
-  cancel(): void {
-    this.router.navigate([this.getForumBasePath()]);
+  /** Show Images section on new post (before publish). */
+  isNewPostForm(): boolean {
+    return !this.isEdit && !this.currentPost;
   }
 
-  clearMessages(): void {
-    this.errorMessage = '';
-    this.successMessage = '';
-    this.fieldErrors = {};
+  onPendingImagesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    if (!files?.length) return;
+    for (let i = 0; i < files.length; i++) {
+      this.pendingImageFiles.push(files[i]);
+      this.pendingPreviewUrls.push(URL.createObjectURL(files[i]));
+    }
+    input.value = '';
+    this.imageUploadError = '';
+    this.cdr.markForCheck();
+  }
+
+  removePendingImage(index: number): void {
+    URL.revokeObjectURL(this.pendingPreviewUrls[index]);
+    this.pendingPreviewUrls.splice(index, 1);
+    this.pendingImageFiles.splice(index, 1);
+    this.cdr.markForCheck();
+  }
+
+  private revokePendingPreviews(): void {
+    this.pendingPreviewUrls.forEach(u => URL.revokeObjectURL(u));
+    this.pendingPreviewUrls = [];
+  }
+
+  onImagesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    if (!files?.length || !this.postId) return;
+    this.imageUploadError = '';
+    this.uploadingImages = true;
+    this.cdr.markForCheck();
+    this.forumService.uploadPostImages(this.postId, Array.from(files)).subscribe({
+      next: () => {
+        this.uploadingImages = false;
+        input.value = '';
+        this.forumService.getPostById(this.postId!).subscribe({
+          next: (post) => {
+            this.currentPost = post;
+            this.cdr.markForCheck();
+          }
+        });
+      },
+      error: (err) => {
+        this.uploadingImages = false;
+        this.imageUploadError = err?.error?.message || err?.error || 'Failed to upload. Max 5MB, JPEG/PNG/GIF/WebP only.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  deleteImage(index: number): void {
+    if (!this.currentPost?.imageIds?.length || this.currentPost.imageIds.length <= index || !confirm('Remove this image?')) return;
+    const imageId = this.currentPost.imageIds[index];
+    this.forumService.deletePostImage(this.currentPost.id, imageId).subscribe({
+      next: () => {
+        this.currentPost!.imageUrls = this.currentPost!.imageUrls?.filter((_, i) => i !== index) ?? [];
+        this.currentPost!.imageIds = this.currentPost!.imageIds?.filter((_, i) => i !== index) ?? [];
+        this.cdr.markForCheck();
+      },
+      error: () => alert('Failed to remove image.')
+    });
+  }
+
+  viewPost(): void {
+    this.router.navigate([this.getForumBasePath(), this.postId]);
+  }
+
+  cancel(): void {
+    this.router.navigate([this.getForumBasePath()]);
   }
 
   private getForumBasePath(): string {
@@ -163,138 +270,5 @@ export class PostFormComponent implements OnInit {
     }
 
     return '/homePage';
-  }
-
-  // Helper methods for template
-  getFieldErrorMessage(fieldName: string): string {
-    // Check for server-side field errors first
-    if (this.fieldErrors[fieldName]) {
-      return this.fieldErrors[fieldName];
-    }
-
-    const control = this.postForm.get(fieldName);
-    if (!control || !control.errors) {
-      return '';
-    }
-
-    if (control.errors['required']) {
-      return `${this.capitalizeFirst(fieldName)} is required`;
-    }
-    if (control.errors['minlength']) {
-      const minLength = control.errors['minlength'].requiredLength;
-      return `${this.capitalizeFirst(fieldName)} must be at least ${minLength} characters`;
-    }
-    if (control.errors['maxlength']) {
-      const maxLength = control.errors['maxlength'].requiredLength;
-      return `${this.capitalizeFirst(fieldName)} cannot exceed ${maxLength} characters`;
-    }
-    if (control.errors['whitespace']) {
-      return `${this.capitalizeFirst(fieldName)} cannot contain only whitespace`;
-    }
-    return 'Invalid input';
-  }
-
-  isFieldInvalid(fieldName: string): boolean {
-    // Check if there's a server-side error for this field
-    if (this.fieldErrors[fieldName]) {
-      return true;
-    }
-    const control = this.postForm.get(fieldName);
-    return !!(control && control.invalid && (this.submitted || control.touched));
-  }
-
-  isFieldValid(fieldName: string): boolean {
-    const control = this.postForm.get(fieldName);
-    return !!(control && control.valid && control.touched);
-  }
-
-  getRemainingChars(fieldName: string, maxLength: number): number {
-    const control = this.postForm.get(fieldName);
-    const currentLength = control?.value?.length || 0;
-    return maxLength - currentLength;
-  }
-
-  // Expose Object.keys to template
-  Object = Object;
-
-  capitalizeFieldName(field: string): string {
-    return this.capitalizeFirst(field);
-  }
-
-  private capitalizeFirst(str: string): string {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  }
-
-  private handleServerError(err: any): void {
-    console.error('Server error:', err);
-    
-    // Clear previous field errors
-    this.fieldErrors = {};
-    this.successMessage = '';
-
-    if (err.status === 400) {
-      // Bad Request - likely validation errors
-      if (err.error) {
-        // Check for different error response formats
-        if (typeof err.error === 'string') {
-          this.errorMessage = err.error;
-        } else if (err.error.message) {
-          this.errorMessage = err.error.message;
-        } else if (err.error.errors) {
-          // Handle field-specific errors
-          const errors = err.error.errors;
-          if (Array.isArray(errors)) {
-            errors.forEach((error: any) => {
-              if (error.field && error.message) {
-                this.fieldErrors[error.field] = error.message;
-              }
-            });
-          } else if (typeof errors === 'object') {
-            Object.keys(errors).forEach(field => {
-              this.fieldErrors[field] = Array.isArray(errors[field]) 
-                ? errors[field][0] 
-                : errors[field];
-            });
-          }
-          this.errorMessage = 'Please correct the validation errors in the form.';
-        } else if (err.error.title || err.error.content) {
-          // Direct field errors at root level
-          if (err.error.title) this.fieldErrors['title'] = err.error.title;
-          if (err.error.content) this.fieldErrors['content'] = err.error.content;
-          this.errorMessage = 'Please correct the validation errors in the form.';
-        } else {
-          this.errorMessage = 'Invalid request. Please check your input.';
-        }
-      } else {
-        this.errorMessage = 'Invalid request. Please check your input.';
-      }
-    } else if (err.status === 401) {
-      this.errorMessage = 'You are not authorized. Please log in again.';
-    } else if (err.status === 403) {
-      this.errorMessage = 'You do not have permission to perform this action.';
-    } else if (err.status === 404) {
-      this.errorMessage = 'The requested resource was not found.';
-    } else if (err.status === 409) {
-      // Conflict - e.g., user already exists
-      this.errorMessage = err.error?.message || 'User already exists. Please use a different username or email.';
-    } else if (err.status === 500) {
-      this.errorMessage = 'Server error. Please try again later.';
-    } else if (err.status === 0) {
-      this.errorMessage = 'Unable to connect to the server. Please check your internet connection.';
-    } else {
-      this.errorMessage = err.error?.message || `An error occurred: ${err.statusText || 'Unknown error'}`;
-    }
-
-    this.scrollToError();
-  }
-
-  private scrollToError(): void {
-    // Scroll to the first error in the form
-    setTimeout(() => {
-      const errorElement = document.querySelector('.error-message, .error-alert');
-      if (errorElement) {
-        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
   }
 }

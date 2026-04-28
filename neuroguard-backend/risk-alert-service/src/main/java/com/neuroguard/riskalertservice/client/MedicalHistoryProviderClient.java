@@ -11,6 +11,9 @@ import java.util.List;
 @FeignClient(name = "medical-history-service", path = "/api/provider/medical-history")
 public interface MedicalHistoryProviderClient {
 
+    @GetMapping("/{patientId}")
+    com.neuroguard.riskalertservice.dto.MedicalHistorySummary getMedicalHistoryByPatientId(@PathVariable("patientId") Long patientId);
+
     @GetMapping("/features/{patientId}")
     PatientFeatures getPatientFeatures(@PathVariable("patientId") Long patientId);
 

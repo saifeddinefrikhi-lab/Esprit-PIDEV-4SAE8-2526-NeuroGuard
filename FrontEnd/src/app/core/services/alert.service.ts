@@ -22,11 +22,30 @@ export class AlertService {
     private authService: AuthService,
     private notificationService: NotificationService
   ) {
-    this.initializeWebSocketConnection();
+    // Listen for authentication state changes to manage WebSocket lifecycle
+    this.authService.isLoggedIn$.subscribe((isLoggedIn) => {
+      if (isLoggedIn) {
+        // Only initialize WebSocket when user is actually logged in
+        if (!this.stompClient || !this.stompClient.active) {
+          this.initializeWebSocketConnection();
+        }
+      } else {
+        // Disconnect WebSocket when user logs out
+        this.disconnectWebSocket();
+      }
+    });
   }
 
   private initializeWebSocketConnection(): void {
-    const token = this.authService.getToken() || '';
+    // Get token at initialization time, not at constructor time
+    const token = this.authService.getToken();
+
+    // Do not proceed if token is invalid
+    if (!token) {
+      console.warn('[AlertService] Cannot initialize WebSocket: no valid token available');
+      return;
+    }
+
     const wsUrl = this.apiUrl.replace('http', 'ws').replace('https', 'wss') + '/ws/alerts?token=' + token;
     this.stompClient = new Client({
       brokerURL: wsUrl,
@@ -120,7 +139,22 @@ export class AlertService {
   getProviderAlertStream(): Observable<AlertResponse> {
     return this.providerAlertSubject.asObservable();
   }
-  
+
+  private disconnectWebSocket(): void {
+    if (this.stompClient && this.stompClient.active) {
+      console.log('[AlertService] Disconnecting WebSocket due to logout');
+      this.stompClient.deactivate().then(() => {
+        console.log('[AlertService] WebSocket disconnected successfully');
+      }).catch((error) => {
+        console.error('[AlertService] Error disconnecting WebSocket:', error);
+      });
+      this.stompClient = null;
+    }
+    // Clear pending subscriptions when disconnecting
+    this.pendingPatientSubscriptions = [];
+    this.subscribedPatientIds.clear();
+  }
+
   // Queue for patient IDs to subscribe when STOMP connects
   private pendingPatientSubscriptions: number[] = [];
   private subscribedPatientIds = new Set<number>();
@@ -315,29 +349,22 @@ export class AlertService {
 
   // Resolve an alert
   resolveAlert(alertId: number): Observable<AlertResponse> {
-       const userRole = this.authService.currentUser?.role?.toUpperCase() || 'PROVIDER';
-       let endpoint: string;
+    const role = this.authService.currentUser?.role?.toUpperCase() || '';
+    let endpoint = `${this.apiUrl}/api/provider/alerts/${alertId}/resolve`;
 
-       switch (userRole) {
-         case 'CAREGIVER':
-           endpoint = `${this.apiUrl}/api/caregiver/alerts/${alertId}/resolve`;
-           break;
-         case 'PATIENT':
-           endpoint = `${this.apiUrl}/api/patient/alerts/${alertId}/resolve`;
-           break;
-         case 'PROVIDER':
-         default:
-           endpoint = `${this.apiUrl}/api/provider/alerts/${alertId}/resolve`;
-           break;
-       }
+    if (role.includes('PATIENT')) {
+      endpoint = `${this.apiUrl}/api/patient/alerts/${alertId}/resolve`;
+    } else if (role.includes('CAREGIVER')) {
+      endpoint = `${this.apiUrl}/api/caregiver/alerts/${alertId}/resolve`;
+    }
 
-       console.log(`[AlertService] Resolving alert ${alertId} at: ${endpoint}`);
-       return this.http.patch<AlertResponse>(endpoint, {})
-         .pipe(catchError(err => {
-           console.error(`[AlertService] Resolve alert ${alertId} error:`, err);
-           return this.handleError(err);
-         }));
-     }
+    console.log(`[AlertService] Resolving alert ${alertId} at: ${endpoint}`);
+    return this.http.patch<AlertResponse>(endpoint, {})
+      .pipe(catchError(err => {
+        console.error(`[AlertService] Resolve alert ${alertId} error:`, err);
+        return this.handleError(err);
+      }));
+  }
 
   // Delete an alert
   deleteAlert(alertId: number): Observable<void> {
@@ -353,10 +380,19 @@ export class AlertService {
 
   // Get alerts for a specific patient (provider view)
   getAlertsByPatient(patientId: number): Observable<AlertResponse[]> {
-    console.log(`[AlertService] Fetching alerts for patient ${patientId} from: ${this.apiUrl}/api/provider/alerts/patient/${patientId}`);
-    return this.http.get<AlertResponse[]>(`${this.apiUrl}/api/provider/alerts/patient/${patientId}`)
+    const role = this.authService.currentUser?.role?.toUpperCase() || '';
+    let endpoint = `${this.apiUrl}/api/provider/alerts/patient/${patientId}`;
+
+    if (role.includes('PATIENT')) {
+      endpoint = `${this.apiUrl}/api/patient/alerts`;
+    } else if (role.includes('CAREGIVER')) {
+      endpoint = `${this.apiUrl}/api/caregiver/alerts`;
+    }
+
+    console.log(`[AlertService] Fetching alerts from: ${endpoint} for role: ${role}`);
+    return this.http.get<AlertResponse[]>(endpoint)
       .pipe(catchError(err => {
-        console.error(`[AlertService] Get alerts for patient ${patientId} error:`, err);
+        console.error(`[AlertService] Get alerts error:`, err);
         return this.handleError(err);
       }));
   }

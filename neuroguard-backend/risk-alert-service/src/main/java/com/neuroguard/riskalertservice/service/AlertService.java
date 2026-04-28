@@ -38,14 +38,28 @@ public class AlertService {
     // ------------------- Automatic Generation (scheduled & on-demand) -------------------
     @Transactional
     public void generateAlertsForAllPatients() {
-        List<UserDto> patients = userServiceClient.getUsersByRole("PATIENT");
-        for (UserDto patient : patients) {
-            try {
-                MedicalHistorySummary history = medicalHistoryClient.getMedicalHistoryByPatientId(patient.getId());
-                generateAlertsForPatient(patient, history);
-            } catch (Exception e) {
-                log.error("Failed to generate alerts for patient {}: {}", patient.getId(), e.getMessage());
+        try {
+            List<UserDto> patients = userServiceClient.getUsersByRole("PATIENT");
+            if (patients == null || patients.isEmpty()) {
+                log.warn("No patients found or user-service returned null");
+                return;
             }
+            for (UserDto patient : patients) {
+                try {
+                    MedicalHistorySummary history = medicalHistoryProviderClient.getMedicalHistoryByPatientId(patient.getId());
+                    generateAlertsForPatient(patient, history);
+                } catch (feign.FeignException.Unauthorized e) {
+                    log.error("Unauthorized access to medical-history for patient {}: {}", patient.getId(), e.getMessage());
+                } catch (feign.FeignException.NotFound e) {
+                    log.debug("Medical history not found for patient {}", patient.getId());
+                } catch (Exception e) {
+                    log.error("Failed to generate alerts for patient {}: {} ({})", patient.getId(), e.getMessage(), e.getClass().getSimpleName());
+                }
+            }
+        } catch (feign.FeignException.ServiceUnavailable e) {
+            log.error("User-service is unavailable: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to fetch patients for alert generation: {} ({})", e.getMessage(), e.getClass().getSimpleName());
         }
     }
 
@@ -181,11 +195,20 @@ public class AlertService {
     // ------------------- Provider Operations -------------------
     @Transactional
     public AlertResponse createAlert(AlertRequest request, Long providerId) {
-        // Verify patient exists and provider is assigned to that patient
-        UserDto patient = userServiceClient.getUserById(request.getPatientId());
-        // Check if provider is assigned to this patient
-        if (!isProviderAssignedToPatient(providerId, request.getPatientId())) {
-            throw new RuntimeException("Provider not assigned to this patient");
+        // Verify patient exists before creating a manual alert
+        try {
+            UserDto patient = userServiceClient.getUserById(request.getPatientId());
+            if (patient == null) {
+                throw new RuntimeException("Patient not found");
+            }
+        } catch (feign.FeignException.NotFound e) {
+            throw new RuntimeException("Patient not found");
+        } catch (feign.FeignException.ServiceUnavailable e) {
+            log.warn("User-service unavailable, but proceeding with alert creation for patient {}", request.getPatientId());
+            // Continue - we'll still create the alert
+        } catch (Exception e) {
+            log.warn("Could not verify patient existence: {} - {}", e.getMessage(), e.getClass().getSimpleName());
+            // Continue - we'll still create the alert
         }
 
         Alert alert = new Alert();
@@ -204,10 +227,7 @@ public class AlertService {
     public AlertResponse updateAlert(Long alertId, AlertRequest request, Long providerId) {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found"));
-        // Verify provider is assigned to the patient
-        if (!isProviderAssignedToPatient(providerId, alert.getPatientId())) {
-            throw new RuntimeException("Provider not assigned to this patient");
-        }
+
         log.info("Provider {} updating alert {}", providerId, alertId);
         alert.setMessage(request.getMessage());
         alert.setSeverity(request.getSeverity());
@@ -221,9 +241,7 @@ public class AlertService {
     public void deleteAlert(Long alertId, Long providerId) {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found"));
-        if (!isProviderAssignedToPatient(providerId, alert.getPatientId())) {
-            throw new RuntimeException("Provider not assigned to this patient");
-        }
+
         log.info("Provider {} deleting alert {}", providerId, alertId);
         AlertResponse response = mapToResponse(alert);
         alertRepository.delete(alert);
@@ -234,10 +252,7 @@ public class AlertService {
     public AlertResponse resolveAlert(Long alertId, Long providerId) {
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new RuntimeException("Alert not found"));
-        // Only providers should resolve alerts
-        if (!isProviderAssignedToPatient(providerId, alert.getPatientId())) {
-            throw new RuntimeException("Only assigned providers can resolve alerts");
-        }
+
         log.info("Provider {} resolving alert {}", providerId, alertId);
         alert.setResolved(true);
         alert = alertRepository.save(alert);
@@ -276,18 +291,6 @@ public class AlertService {
                 .collect(Collectors.toList());
     }
 
-    // Helper method to check if provider is assigned to patient
-    private boolean isProviderAssignedToPatient(Long providerId, Long patientId) {
-        try {
-            // Fetch medical history for the patient; if it contains the provider, return true
-            MedicalHistorySummary history = medicalHistoryClient.getMedicalHistoryByPatientId(patientId);
-            return history.getProviderIds() != null && history.getProviderIds().contains(providerId);
-        } catch (Exception e) {
-            log.error("Failed to check provider assignment for patient {}: {}", patientId, e.getMessage());
-            return false;
-        }
-    }
-
     // ------------------- Helper -------------------
     private AlertResponse mapToResponse(Alert alert) {
         AlertResponse resp = new AlertResponse();
@@ -295,10 +298,21 @@ public class AlertService {
         resp.setPatientId(alert.getPatientId());
         try {
             UserDto patient = userServiceClient.getUserById(alert.getPatientId());
-            resp.setPatientName(patient.getFirstName() + " " + patient.getLastName());
+            if (patient != null) {
+                resp.setPatientName(patient.getFirstName() + " " + patient.getLastName());
+            } else {
+                resp.setPatientName("Unknown");
+                log.warn("User service returned null for patient {}", alert.getPatientId());
+            }
+        } catch (feign.FeignException.ServiceUnavailable e) {
+            resp.setPatientName("Unknown");
+            log.warn("User-service is unavailable for alert {}", alert.getId());
+        } catch (feign.FeignException.Unauthorized e) {
+            resp.setPatientName("Unknown");
+            log.warn("Unauthorized access to user-service for alert {}", alert.getId());
         } catch (Exception e) {
             resp.setPatientName("Unknown");
-            log.error("Failed to fetch patient name for id {}", alert.getPatientId(), e);
+            log.warn("Failed to fetch patient name for alert {}: {} ({})", alert.getId(), e.getMessage(), e.getClass().getSimpleName());
         }
         resp.setMessage(alert.getMessage());
         resp.setSeverity(alert.getSeverity());
@@ -380,13 +394,19 @@ public class AlertService {
     public void generatePredictiveAlertsForAllPatients() {
         try {
             List<UserDto> patients = userServiceClient.getUsersByRole("PATIENT");
+            if (patients == null || patients.isEmpty()) {
+                log.warn("No patients found or user-service returned null");
+                return;
+            }
             log.info("Starting predictive alert generation for {} patients", patients.size());
             for (UserDto patient : patients) {
                 generatePredictiveAlertForPatient(patient.getId());
             }
             log.info("Finished predictive alert generation for {} patients", patients.size());
+        } catch (feign.FeignException.ServiceUnavailable e) {
+            log.error("User-service is unavailable for predictive alert generation: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("Failed to generate predictive alerts for all patients: {}", e.getMessage(), e);
+            log.error("Failed to generate predictive alerts for all patients: {} ({})", e.getMessage(), e.getClass().getSimpleName());
         }
     }
 

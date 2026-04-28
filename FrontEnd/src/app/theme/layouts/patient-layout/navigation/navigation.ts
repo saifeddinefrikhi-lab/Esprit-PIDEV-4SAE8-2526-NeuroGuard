@@ -21,8 +21,8 @@ export interface NavigationItem {
 
 export const NavigationItems: NavigationItem[] = [
   {
-    id: 'acceuil',
-    title: 'Acceuil',
+    id: 'dashboard',
+    title: 'Dashboard',
     type: 'group',
     icon: 'home', // Ant Design home icon
     children: [
@@ -63,13 +63,21 @@ export const NavigationItems: NavigationItem[] = [
     id: 'appointment',
     title: 'Appointment Management',
     type: 'group',
-    icon: 'calendar', // Ant Design calendar icon
+    icon: 'schedule', // Ant Design schedule icon
     children: [
+      {
+        id: 'find-nearby',
+        title: 'Find Nearby Doctors',
+        type: 'item',
+        url: '/patient/find-nearby-doctors',
+        icon: 'appstore',
+        breadcrumbs: false
+      },
       {
         id: 'reservation',
         title: 'Make a Reservation',
         type: 'item',
-        url: '/patient/reservation',
+        url: '/patient/reservations',
         icon: 'calendar'
       },
       {
@@ -77,7 +85,7 @@ export const NavigationItems: NavigationItem[] = [
         title: 'Consultation History',
         type: 'item',
         url: '/patient/consultation',
-        icon: 'history'
+        icon: 'schedule'
       }
     ]
   },
@@ -92,8 +100,16 @@ export const NavigationItems: NavigationItem[] = [
         id: 'wellness',
         title: 'Wellness Tracking',
         type: 'item',
-        url: '/patient/wellness',
+        url: '/patient/wellbeing',
         icon: 'heart',
+        breadcrumbs: false
+      },
+      {
+        id: 'monitoring',
+        title: 'My Health Monitoring',
+        type: 'item',
+        url: '/patient/monitoring',
+        icon: 'line-chart',
         breadcrumbs: false
       },
       {
@@ -101,7 +117,7 @@ export const NavigationItems: NavigationItem[] = [
         title: 'Medication Reminders',
         type: 'item',
         url: '/patient/medication',
-        icon: 'experiment',
+        icon: 'medicine-box',
         breadcrumbs: false
       },
       {
@@ -112,11 +128,44 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'book',
         breadcrumbs: false
       },
+      
+      {
+        id: 'care-plans',
+        title: 'Care Plans',
+        type: 'item',
+        url: '/patient/care-plans',
+        icon: 'heart',
+        breadcrumbs: false
+      },
+      {
+        id: 'prescriptions',
+        title: 'Prescriptions',
+        type: 'item',
+        url: '/patient/prescriptions',
+        icon: 'file-text',
+        breadcrumbs: false
+      },
+      {
+        id: 'pharmacy',
+        title: 'Locate Pharmacy/Clinic',
+        type: 'item',
+        url: '/patient/pharmacy',
+        icon: 'shop',
+        breadcrumbs: false
+      },
       {
         id: 'alerts',
         title: 'Alerts',
         type: 'item',
         url: '/patient/alerts',
+        icon: 'bell',
+        breadcrumbs: false
+      },
+      {
+        id: 'assurance',
+        title: 'Assurance',
+        type: 'item',
+        url: '/patient/assurance',
         icon: 'bell',
         breadcrumbs: false
       }
@@ -137,6 +186,6 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'file-text', // Ant Design file-text icon
       }
     ]
-  },
+  }
 ];
 

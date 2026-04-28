@@ -49,15 +49,31 @@ export const NavigationItems: NavigationItem[] = [
         type: 'item',
         url: '/provider/patients', // Path to manage patients
         classes: 'nav-item',
-        icon: 'team', // Ant Design team icon
+        icon: 'idcard', // Ant Design idcard icon
       },
       {
         id: 'patient-history',
         title: 'Medical History',
         type: 'item',
-        url: '/provider/medical-history', // Path to view/manage patient medical history
+        url: '/provider/medical-history',
         classes: 'nav-item',
-        icon: 'book', // Ant Design book icon
+        icon: 'book',
+      },
+      {
+        id: 'care-plans',
+        title: 'Care Plans',
+        type: 'item',
+        url: '/provider/care-plans',
+        classes: 'nav-item',
+        icon: 'heart',
+      },
+      {
+        id: 'prescriptions',
+        title: 'Prescriptions',
+        type: 'item',
+        url: '/provider/prescriptions',
+        classes: 'nav-item',
+        icon: 'file-text',
       },
       {
         id: 'patient-medications',
@@ -65,7 +81,7 @@ export const NavigationItems: NavigationItem[] = [
         type: 'item',
         url: '/provider/medications', // Path to manage patient medications
         classes: 'nav-item',
-        icon: 'experiment', // Ant Design experiment icon
+        icon: 'medicine-box', // Ant Design medicine-box icon
       },
     ]
   },
@@ -73,14 +89,23 @@ export const NavigationItems: NavigationItem[] = [
     id: 'appointment-management',
     title: 'Appointment Management',
     type: 'group',
-    icon: 'calendar', // Ant Design calendar icon
+    icon: 'schedule', // Ant Design schedule icon
     children: [
+      {
+        id: 'find-nearby',
+        title: 'Find Nearby Doctors',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/provider/find-nearby-doctors',
+        icon: 'appstore',
+        breadcrumbs: false
+      },
       {
         id: 'schedule-appointments',
         title: 'Schedule Appointments',
         type: 'item',
         classes: 'nav-item',
-        url: '/provider/appointments/schedule', // Path to schedule appointments
+        url: '/provider/consultations', // Existing route for scheduling consultations
         icon: 'calendar', // Ant Design calendar icon
       },
       {
@@ -88,7 +113,7 @@ export const NavigationItems: NavigationItem[] = [
         title: 'View Appointments',
         type: 'item',
         classes: 'nav-item',
-        url: '/provider/appointments', // Path to view appointments
+        url: '/provider/reservations', // Path to view appointments
         icon: 'calendar', // Ant Design calendar icon
       },
     ]
@@ -97,18 +122,26 @@ export const NavigationItems: NavigationItem[] = [
     id: 'consultation-management',
     title: 'Consultation Management',
     type: 'group',
-    icon: 'calendar', // Ant Design calendar icon
+    icon: 'schedule', // Ant Design schedule icon
     children: [
+      {
+        id: 'my-availability',
+        title: 'My Availability',
+        type: 'item',
+        url: '/provider/availability',
+        classes: 'nav-item',
+        icon: 'calendar',
+      },
       {
         id: 'consultation-schedule',
         title: 'Schedule Consultation',
         type: 'item',
-        url: '/provider/consultations/schedule', // Path to schedule consultations
+        url: '/provider/consultations', // Path to schedule consultations
         classes: 'nav-item',
-        icon: 'plus-circle', // Ant Design plus-circle icon
+        icon: 'schedule', // Ant Design schedule icon
       },
       {
-        id: 'consultation-history', 
+        id: 'consultation-history',
         title: 'Consultation History',
         type: 'item',
         url: '/provider/consultations/history', // Path to view consultation history

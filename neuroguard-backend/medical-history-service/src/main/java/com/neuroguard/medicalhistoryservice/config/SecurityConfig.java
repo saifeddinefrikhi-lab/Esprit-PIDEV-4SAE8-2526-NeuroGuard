@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
@@ -40,10 +41,14 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("OPTIONS", "/**").permitAll()
+                        .requestMatchers("/files/**").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/patient/medical-history/me/files").permitAll()
                         .requestMatchers("/api/patient/**").hasRole("PATIENT")
                         .requestMatchers("/api/provider/**").hasRole("PROVIDER")
                         .requestMatchers("/api/caregiver/**").hasRole("CAREGIVER")
+                        .requestMatchers("/api/statistics/**").authenticated()
                         .anyRequest().authenticated());
         return http.build();
     }

@@ -46,11 +46,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String role = jwtUtils.getRoleFromToken(token);
         Long userId = jwtUtils.getUserIdFromToken(token);
 
+        if (role == null || role.isBlank()) {
+            log.warn("Missing role claim in JWT token");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Missing role claim");
+            return;
+        }
+
+        String normalizedRole = role.startsWith("ROLE_") ? role.substring(5) : role;
+
         request.setAttribute("userId", userId);
-        request.setAttribute("userRole", role);
+        request.setAttribute("userRole", normalizedRole);
 
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                username, null, List.of(new SimpleGrantedAuthority("ROLE_" + role))
+            username, null, List.of(new SimpleGrantedAuthority("ROLE_" + normalizedRole))
         );
         auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(auth);

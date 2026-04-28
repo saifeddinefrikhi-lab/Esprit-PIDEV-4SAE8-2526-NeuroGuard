@@ -1,4 +1,5 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectorRef, AfterViewInit, NgZone } from '@angular/core';
+declare var google: any;
 import { AuthService } from '../../../core/services/auth.service';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl } from '@angular/forms';
@@ -12,7 +13,7 @@ import { timeout, finalize } from 'rxjs';
   templateUrl: './auth-register.component.html',
   styleUrls: ['./auth-register.component.scss']
 })
-export class AuthRegisterComponent {
+export class AuthRegisterComponent implements AfterViewInit {
   registerForm: FormGroup;
   submitted = false;
   isLoading = false;
@@ -20,10 +21,11 @@ export class AuthRegisterComponent {
   errorMessage = '';
 
   constructor(
-    private authService: AuthService, 
+    private authService: AuthService,
     private router: Router,
     private fb: FormBuilder,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {
     this.registerForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(2)]],
@@ -37,8 +39,7 @@ export class AuthRegisterComponent {
       email: ['', [Validators.required, Validators.email]],
       phoneNumber: ['', [
         Validators.required,
-        // Accept international (+216...) or local digits (216..., 0612...)
-        Validators.pattern(/^\+?\d{6,15}$/)
+        Validators.pattern(/^\+\d{1,3}\d{6,14}$/) // International format: +12334567890
       ]],
       gender: ['', Validators.required],
       age: ['', [Validators.required, Validators.min(18), Validators.max(150)]],
@@ -50,8 +51,78 @@ export class AuthRegisterComponent {
       ]],
       confirmPassword: ['', Validators.required],
       role: ['PATIENT', Validators.required]
-    }, { 
-      validators: this.passwordMatchValidator 
+    }, {
+      validators: this.passwordMatchValidator
+    });
+  }
+
+  ngAfterViewInit(): void {
+    this.initializeGoogleSignIn();
+  }
+
+  private initializeGoogleSignIn(): void {
+    if (typeof google !== 'undefined') {
+      google.accounts.id.initialize({
+        client_id: '550789921754-tdpg2nso52gvhr2mgdhk0ra01hk79kt8.apps.googleusercontent.com',
+        callback: (response: any) => this.ngZone.run(() => this.handleGoogleCredential(response))
+      });
+
+      google.accounts.id.renderButton(
+        document.getElementById('google-btn-container-register'),
+        { theme: 'outline', size: 'large', shape: 'rectangular' }
+      );
+    } else {
+      setTimeout(() => this.initializeGoogleSignIn(), 500);
+    }
+  }
+
+  private handleGoogleCredential(response: any): void {
+    console.log('Received Google credential');
+    const credential = response.credential;
+    this.isLoading = true;
+
+    this.authService.googleLogin(credential).subscribe({
+      next: (res) => {
+        if (res && res.newUser) {
+          console.log('New user detected - completing registration');
+          this.authService.googleComplete(credential, 'PATIENT').subscribe({
+            next: () => {
+              this.successMessage = 'Account created successfully! Redirecting...';
+              this.isLoading = false;
+              this.cdr.detectChanges();
+
+              setTimeout(() => {
+                const token = localStorage.getItem('authToken');
+                if (token) {
+                  this.authService.redirectBasedOnRole(this.authService.getRoleFromToken(token));
+                }
+              }, 1500);
+            },
+            error: (err) => {
+              console.error('Registration completion failed:', err);
+              this.errorMessage = err.message || 'Failed to complete registration.';
+              this.isLoading = false;
+              this.cdr.detectChanges();
+            }
+          });
+          return;
+        }
+
+        this.successMessage = 'Login successful! Redirecting...';
+        this.isLoading = false;
+        setTimeout(() => {
+          const token = localStorage.getItem('authToken');
+          if (token) {
+            this.authService.redirectBasedOnRole(this.authService.getRoleFromToken(token));
+          }
+        }, 1500);
+      },
+      error: (error) => {
+        console.error('Google login error:', error);
+        this.errorMessage = error.message || 'Google authentication failed.';
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -134,7 +205,7 @@ export class AuthRegisterComponent {
       return 'Phone number is required';
     }
     if (control.hasError('pattern')) {
-      return 'Phone number must contain 6–15 digits (optionally starting with +)';
+      return 'Phone number must be in format: +12334567890 (+ followed by country code and number)';
     }
     return '';
   }

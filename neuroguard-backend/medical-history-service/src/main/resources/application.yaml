@@ -14,7 +14,7 @@ spring:
             enable: true
 
   datasource:
-    url: jdbc:mysql://localhost:3308/medical_history_db?createDatabaseIfNotExist=true
+    url: jdbc:mysql://localhost:3306/medical_history_db?createDatabaseIfNotExist=true
     username: root
     password: ""
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -39,12 +39,12 @@ server:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8763/eureka/
+      defaultZone: http://localhost:8761/eureka
     register-with-eureka: true
     fetch-registry: true
 
 jwt:
-  secret: XDkzF2YNPA/7vXmPYJmaACjY6VBhwHJbr4pzPF5jguE=   # must match user-service secret
+  secret: XDkzF2YNPA/7vXmPYJmaACjY6VBhwHJbr4pzPF5jguE=
 
 # Azure Blob Storage configuration
 azure:
@@ -52,11 +52,11 @@ azure:
     connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
     container-name: medical-records
     cdn-endpoint-url: ${AZURE_CDN_ENDPOINT_URL:}
-    enabled: true  # Enable Azure storage (env vars will be loaded from .env)
+    enabled: ${AZURE_STORAGE_ENABLED:false}
 
 # Feign client configuration for user-service
 user-service:
-  url: http://localhost:8085   # or use service discovery, Feign will resolve via Eureka
+  url: http://localhost:8081   # or use service discovery, Feign will resolve via Eureka
 
 logging:
   level:

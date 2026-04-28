@@ -6,6 +6,24 @@
         <h1 class="forum-title">Community Forum</h1>
         <p class="forum-subtitle">Share experiences, ask questions, and connect with others</p>
       </div>
+      <div class="header-actions">
+        <div class="search-wrap">
+          <input type="text" class="search-input" placeholder="Search posts..." [(ngModel)]="searchQuery" (keyup.enter)="runSearch()">
+          <button type="button" class="btn-search" (click)="runSearch()">Search</button>
+        </div>
+        <label class="filter-label">
+          Category
+          <select class="filter-select" [(ngModel)]="selectedCategoryId" (ngModelChange)="onCategoryChange($event)">
+            <option [ngValue]="null">All categories</option>
+            <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
+          </select>
+        </label>
+        <label class="sort-label">
+          Sort by
+          <select class="sort-select" [value]="sortOption" (change)="setSort($any($event.target).value)">
+            <option *ngFor="let opt of sortOptions" [value]="opt.value">{{ opt.label }}</option>
+          </select>
+        </label>
       <button *ngIf="authService.isLoggedIn" (click)="createPost()" class="btn-create-post">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -13,6 +31,7 @@
         </svg>
         New Post
       </button>
+      </div>
     </div>
   </div>
 
@@ -38,12 +57,20 @@
         <div class="author-info">
           <div class="avatar">{{ (post.authorUsername || 'Unknown').charAt(0).toUpperCase() }}</div>
           <div class="author-details">
-            <h4 class="author-name">{{ post.authorUsername || 'Unknown User' }}</h4>
+            <h4 class="author-name">
+              {{ post.authorUsername || 'Unknown User' }}
+              <span *ngIf="post.authorRole" class="role-badge" [attr.data-role]="post.authorRole">{{ roleBadgeLabel(post.authorRole) }}</span>
+            </h4>
             <span class="post-date">{{ post.createdAt | date:'MMM d, y' }}</span>
           </div>
         </div>
-        <div *ngIf="canEditOrDelete(post)" class="post-menu">
-          <button (click)="editPost(post.id, $event)" class="btn-icon" title="Edit">
+        <div *ngIf="canEditOrDelete(post) || isAdmin()" class="post-menu">
+          <button *ngIf="isAdmin()" (click)="togglePin(post, $event)" class="btn-icon" [title]="post.pinned ? 'Unpin' : 'Pin'">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M2 12l10-10 10 10"/>
+            </svg>
+          </button>
+          <button *ngIf="canEditOrDelete(post)" (click)="editPost(post.id, $event)" class="btn-icon" title="Edit">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -60,8 +87,16 @@
 
       <!-- Post Content -->
       <div class="post-content">
-        <h3 class="post-title">{{ post.title }}</h3>
+        <div *ngIf="post.imageUrls?.length" class="post-thumbnail-wrap" (click)="$event.stopPropagation()">
+          <img [src]="forumService.getPostImageUrl(post.imageUrls[0])" alt="" class="post-thumbnail">
+        </div>
+        <h3 class="post-title">
+          <span *ngIf="post.pinned" class="pinned-badge">Pinned</span>
+          <span class="category-badge" [class.category-uncategorized]="!post.categoryName">{{ post.categoryName || 'Uncategorized' }}</span>
+          {{ post.title }}
+        </h3>
         <p class="post-excerpt">{{ post.content | slice:0:200 }}<span *ngIf="post.content.length > 200">...</span></p>
+        <span *ngIf="post.readabilityLabel" class="readability-badge" [attr.data-level]="post.readabilityLabel">Readability: {{ post.readabilityLabel }}</span>
       </div>
 
       <!-- Post Stats -->
@@ -115,6 +150,20 @@
           </svg>
           <span>Share</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div *ngIf="totalPages > 1 && posts.length > 0" class="pagination-wrap">
+      <p class="pagination-info">
+        Showing {{ currentPage * pageSize + 1 }}–{{ currentPage * pageSize + posts.length }} of {{ totalElements }}
+      </p>
+      <div class="pagination">
+        <button type="button" class="pagination-btn" [disabled]="currentPage === 0" (click)="goToPage(currentPage - 1)">Previous</button>
+        <span class="pagination-pages">
+          <button *ngFor="let p of getPageNumbers()" type="button" class="pagination-btn" [class.active]="p === currentPage" (click)="goToPage(p)">{{ p + 1 }}</button>
+        </span>
+        <button type="button" class="pagination-btn" [disabled]="currentPage >= totalPages - 1" (click)="goToPage(currentPage + 1)">Next</button>
       </div>
     </div>
 

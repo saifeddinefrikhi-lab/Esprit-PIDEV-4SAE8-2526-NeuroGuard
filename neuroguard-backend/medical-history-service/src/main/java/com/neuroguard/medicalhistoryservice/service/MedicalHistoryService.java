@@ -12,9 +12,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -81,7 +83,8 @@ public class MedicalHistoryService {
     @Transactional
     public MedicalHistoryResponse createMedicalHistory(MedicalHistoryRequest request, Long providerId) {
         if (historyRepository.existsByPatientId(request.getPatientId())) {
-            throw new RuntimeException("Medical history already exists for patient: " + request.getPatientId());
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Medical history already exists for patient: " + request.getPatientId());
         }
 
         MedicalHistory history = mapRequestToEntity(request);
@@ -237,20 +240,38 @@ public class MedicalHistoryService {
             throw new RuntimeException("Access denied: Only patients and providers can upload files");
         }
 
-        if (azureStorageService == null) {
-            throw new RuntimeException("Azure Blob Storage is not configured. Please set AZURE_STORAGE_ENABLED=true and AZURE_STORAGE_CONNECTION_STRING environment variable.");
+        String fileName = java.util.UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String blobName = patientId + "/" + fileName;
+        String filePath = null;
+
+        if (azureStorageService != null) {
+            try {
+                // Upload file to Azure Blob Storage
+                azureStorageService.uploadFile(blobName, file.getInputStream(), file.getSize());
+                log.info("File uploaded to Azure Blob Storage: {}", blobName);
+                filePath = blobName;
+            } catch (IllegalStateException e) {
+                log.warn("Azure Storage is disabled, falling back to local file storage.");
+            } catch (IOException e) {
+                log.error("Failed to read file input stream", e);
+                throw new RuntimeException("Failed to upload file: " + e.getMessage(), e);
+            } catch (Exception e) {
+                log.warn("Azure Storage upload failed, falling back to local storage: {}", e.getMessage());
+            }
         }
 
-        // Generate unique blob name: patientId/UUID_originalFilename
-        String blobName = patientId + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
-
-        try {
-            // Upload file to Azure Blob Storage
-            azureStorageService.uploadFile(blobName, file.getInputStream(), file.getSize());
-            log.info("File uploaded to Azure Blob Storage: {}", blobName);
-        } catch (IOException e) {
-            log.error("Failed to read file input stream", e);
-            throw new RuntimeException("Failed to upload file: " + e.getMessage(), e);
+        if (filePath == null) {
+            // Local fallback
+            try {
+                java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads", "medical-history", String.valueOf(patientId));
+                java.nio.file.Files.createDirectories(uploadDir);
+                java.nio.file.Path localPath = uploadDir.resolve(fileName);
+                java.nio.file.Files.copy(file.getInputStream(), localPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                filePath = "uploads/medical-history/" + patientId + "/" + fileName;
+                log.info("File uploaded to local storage: {}", filePath);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to upload file locally", e);
+            }
         }
 
         // Save metadata to database
@@ -258,7 +279,7 @@ public class MedicalHistoryService {
         fileEntity.setMedicalHistoryId(history.getId());
         fileEntity.setFileName(file.getOriginalFilename());
         fileEntity.setFileType(file.getContentType());
-        fileEntity.setFilePath(blobName);  // Store blob name (not full path)
+        fileEntity.setFilePath(filePath);  // Store path
         fileEntity.setUploadedAt(LocalDateTime.now());
 
         fileEntity = fileRepository.save(fileEntity);
@@ -321,7 +342,16 @@ public class MedicalHistoryService {
             throw new RuntimeException("File does not belong to this medical history");
         }
 
-        deleteFileFromAzure(file.getFilePath());
+        if (file.getFilePath() != null && file.getFilePath().startsWith("uploads/")) {
+            try {
+                java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(file.getFilePath()));
+                log.info("Deleted local file: {}", file.getFilePath());
+            } catch (IOException e) {
+                log.error("Failed to delete local file: {}", file.getFilePath(), e);
+            }
+        } else {
+            deleteFileFromAzure(file.getFilePath());
+        }
         fileRepository.delete(file);
     }
 
@@ -479,8 +509,14 @@ public class MedicalHistoryService {
         dto.setFileType(file.getFileType());
 
         // Generate CDN URL from blob path if Azure service is available
-        if (azureStorageService != null) {
-            dto.setFileUrl(azureStorageService.generateFileUrl(file.getFilePath()));
+        if (file.getFilePath() != null && file.getFilePath().startsWith("uploads/")) {
+            dto.setFileUrl("/files/" + file.getId());
+        } else if (azureStorageService != null) {
+            try {
+                dto.setFileUrl(azureStorageService.generateFileUrl(file.getFilePath()));
+            } catch (Exception e) {
+                dto.setFileUrl("/files/" + file.getId());
+            }
         } else {
             // Fallback to direct URL if Azure not configured
             dto.setFileUrl("/files/" + file.getId());

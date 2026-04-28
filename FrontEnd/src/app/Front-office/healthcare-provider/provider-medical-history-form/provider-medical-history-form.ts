@@ -29,8 +29,10 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
   patients: UserDto[] = [];
   caregivers: UserDto[] = [];
   providers: UserDto[] = [];
+  selectedProviders: UserDto[] = [];
   selectedPatientId: number | null = null;
   selectedCaregivers: UserDto[] = []; // Track full caregiver objects
+  private pendingHistoryData: MedicalHistoryResponse | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -55,9 +57,9 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
       surgeries: this.fb.array([]),
       providerNames: this.fb.array([]),
       caregiverNames: this.fb.array([]),
-      mmse: [null, [Validators.min(0), Validators.max(30)]],
-      functionalAssessment: [null, [Validators.min(0), Validators.max(10)]],
-      adl: [null, [Validators.min(0), Validators.max(10)]],
+      mmse: [null, [Validators.required, Validators.min(0), Validators.max(30)]],
+      functionalAssessment: [null, [Validators.required, Validators.min(0), Validators.max(10)]],
+      adl: [null, [Validators.required, Validators.min(0), Validators.max(10)]],
       memoryComplaints: [false],
       behavioralProblems: [false],
       smoking: [false],
@@ -240,6 +242,7 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
         console.log('[ProviderMedicalHistoryForm] Loaded caregivers:', data);
         this.caregivers = data;
         this.caregiversLoading = false;
+        this.syncSelectedAssignments();
         this.cdr.markForCheck();
       },
       error: (err) => {
@@ -259,6 +262,7 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
         const currentUserId = this.authService.currentUser?.userId;
         this.providers = data.filter(p => p.id !== currentUserId);
         console.log('[ProviderMedicalHistoryForm] Filtered providers (excluding current user ID:', currentUserId, '):', this.providers);
+        this.syncSelectedAssignments();
         this.cdr.markForCheck();
       },
       error: (err) => {
@@ -279,24 +283,21 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
   // Toggle provider selection (checkbox) – store full name
   toggleProvider(provider: UserDto, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
-    const providerArray = this.form.get('providerNames') as FormArray;
     const fullName = `${provider.firstName} ${provider.lastName}`;
-    const index = providerArray.controls.findIndex(ctrl => ctrl.value === fullName);
-    console.log(`[ProviderMedicalHistoryForm] Toggle provider "${fullName}":`, checked ? 'ADD' : 'REMOVE', 'Current index:', index);
+    const index = this.selectedProviders.findIndex(p => p.id === provider.id);
+    console.log(`[ProviderMedicalHistoryForm] Toggle provider "${fullName}" (ID: ${provider.id}):`, checked ? 'ADD' : 'REMOVE');
     
     if (checked && index === -1) {
-      providerArray.push(this.fb.control(fullName));
-      console.log('[ProviderMedicalHistoryForm] After add, providerNames:', providerArray.value);
+      this.selectedProviders.push(provider);
     } else if (!checked && index !== -1) {
-      providerArray.removeAt(index);
-      console.log('[ProviderMedicalHistoryForm] After remove, providerNames:', providerArray.value);
+      this.selectedProviders.splice(index, 1);
     }
+
+    console.log('[ProviderMedicalHistoryForm] Selected providers:', this.selectedProviders.map(p => `${p.firstName} ${p.lastName} (${p.id})`));
   }
 
   isProviderSelected(provider: UserDto): boolean {
-    const providerArray = this.form.get('providerNames') as FormArray;
-    const fullName = `${provider.firstName} ${provider.lastName}`;
-    return providerArray.controls.some(ctrl => ctrl.value === fullName);
+    return this.selectedProviders.some(p => p.id === provider.id);
   }
 
   // Toggle caregiver selection (checkbox) – track caregiver objects
@@ -341,6 +342,7 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
 
   patchForm(data: MedicalHistoryResponse): void {
     console.log('[ProviderMedicalHistoryForm] Patching form with data:', data);
+    this.pendingHistoryData = data;
     
     this.form.patchValue({
       patientId: data.patientId,
@@ -409,6 +411,7 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
     console.log('[ProviderMedicalHistoryForm] Selected caregivers:', this.selectedCaregivers.map(c => `${c.firstName} ${c.lastName} (ID: ${c.id})`));
 
     this.cdr.markForCheck();
+    this.syncSelectedAssignments();
   }
 
   onSubmit(): void {
@@ -474,8 +477,9 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
           description: s.description.trim(),
           date: s.date
         })),
+      providerIds: this.selectedProviders.map(provider => provider.id),
       providerNames: (raw.providerNames || []).filter((name: string) => name && name.trim()).map((name: string) => name.trim()),
-      // Map selected caregivers to usernames (or full names if username is null)
+      caregiverIds: this.selectedCaregivers.map(caregiver => caregiver.id),
       caregiverNames: this.selectedCaregivers
         .map(c => c.username || `${c.firstName} ${c.lastName}`)
         .filter(name => name && name.trim()),
@@ -525,6 +529,34 @@ export class ProviderMedicalHistoryFormComponent implements OnInit {
           this.cdr.markForCheck();
         }
       });
+    }
+  }
+
+  private syncSelectedAssignments(): void {
+    if (!this.pendingHistoryData) {
+      return;
+    }
+
+    const history = this.pendingHistoryData;
+
+    if (this.providers.length > 0) {
+      const matchedProviders = history.providerIds?.length
+        ? this.providers.filter(provider => history.providerIds?.includes(provider.id))
+        : (history.providerNames || [])
+            .map(name => this.providers.find(provider => `${provider.firstName} ${provider.lastName}` === name || provider.username === name))
+            .filter((provider): provider is UserDto => !!provider);
+
+      this.selectedProviders = Array.from(new Map(matchedProviders.map(provider => [provider.id, provider])).values());
+    }
+
+    if (this.caregivers.length > 0) {
+      const matchedCaregivers = history.caregiverIds?.length
+        ? this.caregivers.filter(caregiver => history.caregiverIds?.includes(caregiver.id))
+        : (history.caregiverNames || [])
+            .map(name => this.caregivers.find(caregiver => `${caregiver.firstName} ${caregiver.lastName}` === name || caregiver.username === name))
+            .filter((caregiver): caregiver is UserDto => !!caregiver);
+
+      this.selectedCaregivers = Array.from(new Map(matchedCaregivers.map(caregiver => [caregiver.id, caregiver])).values());
     }
   }
 

@@ -10,6 +10,9 @@ File: style.css
 // Icons
 @import 'scss/fonts/tabler-icons.min.css';
 
+// Leaflet CSS for maps
+@import 'leaflet/dist/leaflet.css';
+
 // main framework
 @import 'node_modules/bootstrap/scss/functions';
 @import 'node_modules/bootstrap/scss/variables';

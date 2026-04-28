@@ -120,7 +120,13 @@ export class PatientMedicalHistoryComponent implements OnInit {
         this.cdr.markForCheck();
       },
       error: (err) => {
-        this.errorMessage = 'Upload failed.';
+        if (typeof err?.message === 'string' && (err.message.includes('Unauthorized') || err.message.includes('401'))) {
+          this.errorMessage = 'Session expired. Please log in again.';
+        } else if (typeof err?.message === 'string' && (err.message.includes('Forbidden') || err.message.includes('403'))) {
+          this.errorMessage = 'You do not have permission to upload this file.';
+        } else {
+          this.errorMessage = 'Upload failed.';
+        }
         console.error(err);
         this.uploading = false;
         this.cdr.markForCheck();

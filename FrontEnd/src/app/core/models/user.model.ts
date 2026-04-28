@@ -4,4 +4,7 @@ export interface User {
   email: string;
   role: 'patient' | 'caregiver' | 'doctor' | 'admin';
   avatar?: string;
+  longitude?: number;
+  latitude?: number;
+  altitude?: number;
 }

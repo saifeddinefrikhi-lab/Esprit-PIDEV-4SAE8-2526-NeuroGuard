@@ -11,7 +11,9 @@ export interface MedicalHistoryRequest {
   environmentalAllergies?: string;
   foodAllergies?: string;
   surgeries?: Surgery[];
+  providerIds?: number[];
   providerNames?: string[];        // additional providers (by full name)
+  caregiverIds?: number[];
   caregiverNames?: string[];        // caregivers assigned by username
 
   // NEW COGNITIVE AND FUNCTIONAL SCORES

@@ -23,9 +23,49 @@ export class AuthService {
   public isLoggedIn$ = this.isLoggedInSubject.asObservable();
 
   private readonly jwtPattern = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/;
+  private expectedRole: string | null = null;
 
   constructor(private http: HttpClient, private router: Router) {
+    this.setupStorageShield();
     this.initializeCurrentUser();
+  }
+
+  // Debug helper to find out WHO is interacting with the token
+  private setupStorageShield() {
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const originalGetItem = localStorage.getItem.bind(localStorage);
+
+    // Proxy setItem
+    localStorage.setItem = (key: string, value: string) => {
+      if (key === 'authToken') {
+        try {
+          const payload = this.decodeJwtPayload(value);
+          console.group('%c[STORAGE SHIELD] setItem Detected', 'color: #00ff00; font-weight: bold;');
+          console.log(`Setting Role: ${payload.role} | UserId: ${payload.userId}`);
+          console.trace();
+          console.groupEnd();
+        } catch (e) {
+          console.warn('[STORAGE SHIELD] Setting invalid token string');
+        }
+      }
+      originalSetItem(key, value);
+    };
+
+    // Proxy getItem
+    localStorage.getItem = (key: string): string | null => {
+      const val = originalGetItem(key);
+      if (key === 'authToken' && val) {
+        try {
+          const payload = this.decodeJwtPayload(val);
+          // Only warn if the token role doesn't match the expected role for this session
+          if (this.expectedRole && payload.role !== this.expectedRole) {
+             console.warn(`%c[STORAGE SHIELD] Session Alert! Expected ${this.expectedRole} token but got ${payload.role}`, 'color: #ffa500; font-weight: bold;');
+             console.trace();
+          }
+        } catch (e) {}
+      }
+      return val;
+    };
   }
 
   // Check if user is logged in based on stored token
@@ -97,6 +137,9 @@ export class AuthService {
 
   // Login and get JWT token
   login(credentials: any): Observable<any> {
+    // Clear any previous role lockdown before attempting new login to prevent role mismatch errors
+    this.expectedRole = null;
+
     return this.http.post(`${this.apiUrl}/auth/login`, credentials, {
       responseType: 'text'
     }).pipe(
@@ -124,6 +167,7 @@ export class AuthService {
             role: payload.role,
             userId: payload.userId
           };
+          this.expectedRole = payload.role; // Lockdown the role for this session
           this.isLoggedInSubject.next(true);
         } catch (error) {
           localStorage.removeItem('authToken');
@@ -135,12 +179,76 @@ export class AuthService {
     );
   }
 
+  // Login with Google
+  googleLogin(idToken: string): Observable<any> {
+    // Clear any previous role lockdown before attempting new login
+    this.expectedRole = null;
+
+    return this.http.post<any>(`${this.apiUrl}/auth/google`, { idToken }).pipe(
+      tap((response: any) => {
+        // Response can be { token: "..." } or { newUser: true, ... }
+        if (response.newUser) {
+          // Do nothing here, the component will handle the modal
+          return;
+        }
+
+        const token = this.extractJwtToken(response);
+        if (!token) throw new Error('Invalid token received from Google authentication.');
+        
+        localStorage.setItem('authToken', token);
+        this.initializeCurrentUser();
+      }),
+      catchError(this.handleError)
+    );
+  }
+
+  // Finalize Google Signup with Role selection
+  googleComplete(idToken: string, role: string): Observable<any> {
+    // Clear any previous role lockdown before attempting new login
+    this.expectedRole = null;
+
+    return this.http.post<any>(`${this.apiUrl}/auth/google/complete`, { idToken, role }).pipe(
+      tap((response: any) => {
+        const token = this.extractJwtToken(response);
+        if (!token) throw new Error('Failed to complete registration.');
+        
+        localStorage.setItem('authToken', token);
+        this.initializeCurrentUser();
+      }),
+      catchError(this.handleError)
+    );
+  }
+
   // Logout the user and clear token
   logout() {
+    // Clear local session immediately to prevent token usage
+    this.clearLocalSession();
+
+    // Then notify the backend so it can invalidate the token
+    this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({
+      next: () => {
+        console.log('[AuthService] Logout completed on backend');
+      },
+      error: (err) => {
+        console.warn('[AuthService] Backend logout failed, but local session cleared', err);
+      }
+    });
+  }
+
+  private clearLocalSession() {
+    // Clear expectedRole FIRST to prevent token mismatch checks from interfering
+    this.expectedRole = null;
+
+    // Clear all auth-related storage
     localStorage.removeItem('authToken');
     this.currentUser = null;
     this.isLoggedInSubject.next(false);
-    this.router.navigate(['/homePage']);
+
+    console.log('[AuthService] Local session cleared completely');
+
+    // Force a full window reload to the home page to clear all RxJS states
+    // and prevent components from using old tokens/roles.
+    window.location.href = '/homePage';
   }
 
   // Redirect user to their respective dashboard based on role
@@ -182,9 +290,12 @@ export class AuthService {
 
       if (url.includes('/auth/login')) {
         if (error.status === 401 || error.status === 403) {
-          errorMessage = 'Impossible de se connecter avec ces identifiants. Verifiez votre username ou email et votre mot de passe.';
-        } else if (error.status === 502 || error.status === 503) {
-          errorMessage = 'Login service unavailable. Start Eureka (8761), gateway (8083), and user-service (8084), then try again.';
+          // For 403, check if it's a ban/disable message before using generic message
+          if (error.status === 403 && raw && (raw.includes('banned') || raw.includes('disabled'))) {
+            errorMessage = raw;
+          } else {
+            errorMessage = 'Invalid username or password.';
+          }
         } else if (raw) {
           errorMessage = raw;
         } else {
@@ -199,8 +310,6 @@ export class AuthService {
           } else {
             errorMessage = 'An account with these details already exists.';
           }
-        } else if (error.status === 502 || error.status === 503) {
-          errorMessage = 'Registration service unavailable. Start Eureka (8761), gateway (8083), and user-service (8084), then try again.';
         } else if (raw) {
           errorMessage = raw;
         } else {
@@ -220,10 +329,53 @@ export class AuthService {
   }
   
   getToken(): string | null {
-    return this.extractJwtToken(localStorage.getItem('authToken'));
+    const raw = localStorage.getItem('authToken');
+    const token = this.extractJwtToken(raw);
+
+    if (!token) {
+      return null;
+    }
+
+    // Safety check: if we are supposed to be a specific role but the token is different, clear it
+    if (this.expectedRole) {
+      try {
+        const payload = this.decodeJwtPayload(token);
+        if (payload.role !== this.expectedRole) {
+          console.error(
+            `[AUTH CRITICAL] Token inconsistency detected! Expected ${this.expectedRole} but found ${payload.role}.`
+          );
+          // Clear the corrupt token immediately to prevent it from being sent
+          localStorage.removeItem('authToken');
+          this.currentUser = null;
+          this.isLoggedInSubject.next(false);
+          return null;
+        }
+      } catch (e) {
+        console.warn('[AUTH] Failed to validate token payload:', e);
+        // Clear malformed tokens
+        localStorage.removeItem('authToken');
+        return null;
+      }
+    }
+
+    return token;
   }
 
   private extractJwtToken(rawValue: unknown): string | null {
+    if (!rawValue) {
+      return null;
+    }
+
+    // Handle case where rawValue is already a parsed object
+    if (typeof rawValue === 'object') {
+      const obj = rawValue as any;
+      const candidate = obj.token || obj.accessToken || obj.jwt;
+      if (typeof candidate === 'string' && this.jwtPattern.test(candidate.trim())) {
+        return candidate.trim();
+      }
+      return null;
+    }
+
     if (typeof rawValue !== 'string' || !rawValue.trim()) {
       return null;
     }
@@ -252,5 +404,23 @@ export class AuthService {
     const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
     return JSON.parse(atob(padded));
+  }
+
+  // Forgot password - send reset link to email
+  forgotPassword(email: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/auth/forgot-password`, { email }).pipe(
+      catchError(this.handleError)
+    );
+  }
+
+  // Reset password - validate token and update password
+  resetPassword(token: string, newPassword: string, confirmPassword: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/auth/reset-password`, {
+      token,
+      newPassword,
+      confirmPassword
+    }).pipe(
+      catchError(this.handleError)
+    );
   }
 }

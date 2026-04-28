@@ -13,48 +13,50 @@ import java.util.Set;
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret}")
-    private String SECRET_KEY; // Replace with a stronger key
+    @Value("${jwt.secret:default_secret_key_1234567890}")
+    private String SECRET_KEY;
 
     private final Set<String> invalidatedTokens = new HashSet<>();
 
-    public String generateJwtToken(String username, String role, Long userId) {  // add userId parameter
+    public String generateJwtToken(String username, String role, Long userId) {
+        return generateJwtToken(username, role, userId, 0L);
+    }
+
+    public String generateJwtToken(String username, String role, Long userId, long tokenVersion) {
         Algorithm algorithm = Algorithm.HMAC256(SECRET_KEY);
         return JWT.create()
                 .withSubject(username)
                 .withClaim("role", role)
-                .withClaim("userId", userId)          // <-- new claim
+                .withClaim("userId", userId)
+                .withClaim("tokenVersion", tokenVersion)
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 86400000))
+                .withExpiresAt(new Date(System.currentTimeMillis() + 86400000)) // 24 hours
                 .sign(algorithm);
     }
+
     public DecodedJWT verifyToken(String token) {
         return JWT.require(Algorithm.HMAC256(SECRET_KEY)).build().verify(token);
     }
 
-    // Get username from JWT Token
     public String getUsernameFromJwtToken(String token) {
         return JWT.require(Algorithm.HMAC256(SECRET_KEY))
                 .build()
                 .verify(token)
-                .getSubject();  // Extract the username from the token
+                .getSubject();
     }
 
-    // Get role from JWT Token
     public String getRoleFromJwtToken(String token) {
-        DecodedJWT decodedJWT = JWT.require(Algorithm.HMAC256(SECRET_KEY))
-                .build()
-                .verify(token);
-        return decodedJWT.getClaim("role").asString();  // Extract the role from the token
+        DecodedJWT decodedJWT = verifyToken(token);
+        return decodedJWT.getClaim("role").asString();
     }
 
-    // Validate JWT Token
     public boolean validateJwtToken(String token) {
         try {
-            JWT.require(Algorithm.HMAC256(SECRET_KEY)).build().verify(token);
-            return true; // Token is valid
+            if (isTokenInvalidated(token)) return false;
+            verifyToken(token);
+            return true;
         } catch (Exception e) {
-            return false; // Token is invalid
+            return false;
         }
     }
 

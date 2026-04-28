@@ -1,3 +1,32 @@
+<!-- Role Selection Modal for Google Sign-Up -->
+<div class="role-modal-container" *ngIf="showRoleModal">
+  <div class="role-modal-overlay"></div>
+  <div class="role-modal">
+    <div class="modal-content-wrapper">
+      <h2 class="modal-title">Welcome to NeuroGuard</h2>
+      <p class="modal-subtitle">To complete your registration, please select your primary role:</p>
+      
+      <div class="role-cards-container">
+        <div class="role-card" (click)="selectRole('PATIENT')">
+          <div class="role-icon">
+            <i class="ti ti-user-circle"></i>
+          </div>
+          <div class="role-info">
+            <span class="role-name">Patient</span>
+            <p class="role-desc">I want to manage my medical history and track my health.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary w-100" (click)="showRoleModal = false; isLoading = false">
+          Cancel Registration
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="auth-main">
   <div class="auth-wrapper v3">
     <div class="auth-form">
@@ -24,19 +53,10 @@
             <button type="button" class="btn-close" (click)="clearMessages()" aria-label="Close"></button>
           </div>
 
-          <div class="alert alert-warning" role="alert" *ngIf="showLoginHelp">
-            <strong>Verifications utiles :</strong>
-            <div>Assurez-vous que <code>user-service</code> est demarre et qu'il n'y a pas d'erreur MySQL.</div>
-            <div>Inscrivez-vous d'abord si vous n'avez pas encore de compte.</div>
-            <div>Essayez votre <strong>username</strong> ou votre <strong>email</strong> avec le bon mot de passe.</div>
-            <div>Si besoin, verifiez dans phpMyAdmin que l'utilisateur existe bien.</div>
-            <div>Si l'utilisateur existe mais que le mot de passe ne passe pas, recreez le compte ou branchez ensuite une vraie page "Forgot password".</div>
-          </div>
-
           <form [formGroup]="loginForm" (ngSubmit)="onLogin()">
-            <!-- Username / Email -->
+            <!-- Username -->
             <div class="form-group mb-3">
-              <label class="form-label" for="username">Username or email</label>
+              <label class="form-label" for="username">Username</label>
               <input 
                 type="text" 
                 class="form-control" 
@@ -44,7 +64,7 @@
                 [class.is-valid]="submitted && f['username'].valid && !errorMessage"
                 id="username" 
                 formControlName="username"
-                placeholder="Enter your username or email"
+                placeholder="Enter your username"
               />
               <div class="invalid-feedback" *ngIf="submitted && f['username'].invalid">
                 {{ getUsernameErrorMessage() }}
@@ -90,7 +110,7 @@
                   Remember me
                 </label>
               </div>
-              <a [routerLink]="['/register']" class="link-primary">Create account first</a>
+              <a [routerLink]="['/forgot-password']" class="link-primary">Forgot password?</a>
             </div>
 
             <!-- Login Button -->
@@ -111,10 +131,8 @@
 
             <!-- Social Login Options -->
             <div class="d-grid gap-2 social-grid">
-              <button type="button" class="btn btn-outline-secondary">
-                <i class="ti ti-brand-google me-2"></i>
-                Google
-              </button>
+              <div id="google-btn-container" class="d-flex justify-content-center"></div>
+              
               <button type="button" class="btn btn-outline-secondary">
                 <i class="ti ti-brand-facebook me-2"></i>
                 Facebook

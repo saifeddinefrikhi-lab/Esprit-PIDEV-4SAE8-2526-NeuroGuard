@@ -3,7 +3,7 @@ spring:
     name: risk-alert-service
 
   datasource:
-    url: jdbc:mysql://localhost:3308/risk_alert_db?createDatabaseIfNotExist=true
+    url: jdbc:mysql://localhost:3306/risk_alert_db?createDatabaseIfNotExist=true
     username: root
     password: ""
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -17,17 +17,17 @@ spring:
         format_sql: true
 
 server:
-  port: 8085
+  port: 8092
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://localhost:8761/eureka
     register-with-eureka: true
     fetch-registry: true
 
 jwt:
-  secret: ${JWT_SECRET:XDkzF2YNPA/7vXmPYJmaACjY6VBhwHJbr4pzPF5jguE=}  # same as user-service
+  secret: XDkzF2YNPA/7vXmPYJmaACjY6VBhwHJbr4pzPF5jguE=   # matches user-service # same as user-service
 
 logging:
   level:

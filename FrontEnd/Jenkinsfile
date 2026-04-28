@@ -1,0 +1,115 @@
+pipeline {
+    agent any
+
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    environment {
+        GIT_REPO       = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH     = 'main'
+        SONAR_TOKEN    = credentials('sonar-token')
+        SONAR_HOST_URL = credentials('sonar-host-url')
+        DOCKER_IMAGE   = "neuroguard/frontend"
+        DOCKER_TAG     = "${env.BUILD_NUMBER}"
+        SERVICE_DIR    = "FrontEnd"
+    }
+
+    options {
+        timeout(time: 45, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Code Checkout') {
+            steps {
+                git branch: "${GIT_BRANCH}",
+                    url: "${GIT_REPO}"
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh 'npm ci --legacy-peer-deps'
+                }
+            }
+        }
+
+        stage('Karma Unit Tests') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh '''
+                        export DISPLAY=:99
+                        Xvfb :99 -screen 0 1024x768x24 &
+                        npx ng test \
+                            --watch=false \
+                            --browsers=ChromeHeadlessNoSandbox \
+                            --code-coverage
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: "${SERVICE_DIR}/test-results/karma-results.xml"
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                            sonar-scanner \
+                                -Dsonar.projectKey=neuroguard-frontend \
+                                -Dsonar.projectName="NeuroGuard - Angular Frontend" \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src/__tests__ \
+                                -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.exclusions=**/node_modules/**,**/*.spec.ts,**/coverage/**,**/.angular/**,**/dist/**
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Build Production') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh 'npx ng build --configuration=production'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Frontend CI Pipeline FAILED - Build #${env.BUILD_NUMBER}"
+        }
+        success {
+            echo "Frontend CI Pipeline SUCCESS - Build #${env.BUILD_NUMBER}"
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

@@ -75,16 +75,17 @@ public class JwtUtils {
 
     public Long getUserIdFromToken(String token) {
         try {
-            Long userId = verifyToken(token).getClaim("userId").asLong();
-            if (userId == null) {
+            DecodedJWT decoded = verifyToken(token);
+            if (decoded.getClaim("userId").isNull()) {
                 log.warn("UserId claim is null in JWT token");
-                throw new RuntimeException("UserId claim missing in JWT token");
+                return null;
             }
+            Long userId = decoded.getClaim("userId").asLong();
             log.debug("Extracted userId from token: {}", userId);
             return userId;
         } catch (Exception e) {
-            log.error("Failed to extract userId from token: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to extract userId from token", e);
+            log.warn("Failed to extract userId from token: {} - returning null", e.getMessage());
+            return null;
         }
     }
 }

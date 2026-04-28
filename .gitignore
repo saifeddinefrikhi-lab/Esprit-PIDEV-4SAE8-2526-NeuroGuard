@@ -1,40 +1,47 @@
-# ========================
-# IDE / Editor
-# ========================
-.idea/
-*.iml
-.vscode/
-*.code-workspace
-
-# ========================
-# JVM Crash / Replay Logs
-# ========================
+# JVM crash logs (never commit these)
 hs_err_pid*.log
 replay_pid*.log
 
-# ========================
-# Maven Build Artifacts
-# ========================
+# Maven build output
+target/
 **/target/
-**/*.class
-**/*.jar
-**/*.war
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# ========================
-# OS-generated files
-# ========================
-.DS_Store
-Thumbs.db
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
 
-# ========================
-# Node / Angular frontend
-# ========================
-**/node_modules/
-**/dist/
-**/.angular/
+# Eclipse / STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
 
-# ========================
-# Spring Boot
-# ========================
-**/application-local.yml
-**/application-local.properties
+# VS Code
+.vscode/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Angular
+node_modules/
+dist/
+.angular/
+
+# Misc
+test.txt
+*.class

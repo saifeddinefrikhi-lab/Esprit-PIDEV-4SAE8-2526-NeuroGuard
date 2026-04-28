@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
@@ -151,11 +151,20 @@ getMyFiles(): Observable<FileDto[]> {
 
 // Upload file to patient's own history
 uploadFile(file: File): Observable<FileDto> {
+  const token = this.authService.getToken();
   const url = `${this.apiUrl}/api/patient/medical-history/me/files`;
   console.log('[MedicalHistoryService] Uploading file to:', url);
+
+  const headers = token
+    ? new HttpHeaders({ Authorization: `Bearer ${token}` })
+    : undefined;
+
   const formData = new FormData();
   formData.append('file', file);
-  return this.http.post<FileDto>(url, formData)
+  if (token) {
+    formData.append('token', token);
+  }
+  return this.http.post<FileDto>(url, formData, { headers })
     .pipe(catchError(err => this.handleError(err)));
 }
   downloadFile(fileId: number): Observable<Blob> {
