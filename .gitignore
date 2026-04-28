@@ -1,0 +1,40 @@
+# ========================
+# IDE / Editor
+# ========================
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# ========================
+# JVM Crash / Replay Logs
+# ========================
+hs_err_pid*.log
+replay_pid*.log
+
+# ========================
+# Maven Build Artifacts
+# ========================
+**/target/
+**/*.class
+**/*.jar
+**/*.war
+
+# ========================
+# OS-generated files
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Node / Angular frontend
+# ========================
+**/node_modules/
+**/dist/
+**/.angular/
+
+# ========================
+# Spring Boot
+# ========================
+**/application-local.yml
+**/application-local.properties
