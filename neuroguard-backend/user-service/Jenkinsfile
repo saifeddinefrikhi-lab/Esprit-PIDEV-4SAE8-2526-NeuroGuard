@@ -19,24 +19,19 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
-        stage('Build & JUnit Tests') {
-    steps {
-        dir("${SERVICE_DIR}") {
-            // Use a minimal environment to avoid "Argument list too long"
-            withEnv([
-                'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-                'MAVEN_OPTS=-Xmx512m',
-                // Unset any known large variables (customize as needed)
-                'JAVA_TOOL_OPTIONS=',
-                '_JAVA_OPTIONS=',
-                'CLASSPATH='
-            ]) {
-                // Run clean package (already includes tests, so no need separate test run)
-                sh 'mvn clean package -B'
+        stage('JUnit Tests') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "mvn clean test -B"
+                }
+            }
+        stage('Build ') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "mvn clean package -DskipTests"
+                }
             }
         }
-    }
-}
         stage('SonarQube Analysis') {
             steps {
                 dir("${SERVICE_DIR}") {
