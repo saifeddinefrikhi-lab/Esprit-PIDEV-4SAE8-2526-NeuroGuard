@@ -29,6 +29,14 @@ export const routes: Routes = [
         path: 'admin/users',
         loadComponent: () => import('./Back-office/pages/user-list.component/user-list.component').then((c) => c.UserListComponent)
       },
+      {
+        path: 'admin/products',
+        loadComponent: () => import('./Back-office/pages/product-list.component/product-list.component').then((c) => c.ProductListComponent)
+      },
+      {
+        path: 'admin/orders',
+        loadComponent: () => import('./Back-office/pages/order-list.component/order-list.component').then((c) => c.OrderListComponent)
+      },
       
       {
         path: 'admin/forum',

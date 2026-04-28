@@ -147,6 +147,22 @@ export const NavigationItems: NavigationItem[] = [
         classes: 'nav-item',
         icon: 'smile',
       },
+      {
+        id: 'manage-products',
+        title: 'Product Management',
+        type: 'item',
+        url: '/admin/products',
+        classes: 'nav-item',
+        icon: 'shopping-cart',
+      },
+      {
+        id: 'manage-orders',
+        title: 'Order Management',
+        type: 'item',
+        url: '/admin/orders',
+        classes: 'nav-item',
+        icon: 'ordered-list',
+      },
     ]
   },
   {
