@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.neuroguard.assuranceservice.service.AssuranceServiceTests
--------------------------------------------------------------------------------
-Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 20.69 s -- in com.neuroguard.assuranceservice.service.AssuranceServiceTests
