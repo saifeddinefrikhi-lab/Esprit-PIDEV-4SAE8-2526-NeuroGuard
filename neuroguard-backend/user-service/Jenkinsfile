@@ -22,12 +22,7 @@ pipeline {
         stage('Build & JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh '''
-                        mvn clean verify -B \
-                            -Dspring.datasource.url="jdbc:h2:mem:testdb;NON_KEYWORDS=USER" \
-                            -Dspring.datasource.driver-class-name=org.h2.Driver \
-                            -Dspring.jpa.database-platform=org.hibernate.dialect.H2Dialect
-                    '''
+                    sh "mvn clean test -B"
                 }
             }
         }
