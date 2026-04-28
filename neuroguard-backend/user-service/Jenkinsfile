@@ -23,14 +23,14 @@ pipeline {
         stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "./mvnw clean test -B"
+                    sh "mvn clean test -B"
                 }
             }
         }
         stage('Build ') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "./mvnw clean package -DskipTests"
+                    sh "mvn clean package -DskipTests"
                 }
             }
         }
@@ -38,7 +38,7 @@ pipeline {
             steps {
                 dir("${SERVICE_DIR}") {
                     withSonarQubeEnv('SonarQube') {
-                        sh './mvnw sonar:sonar -B -Dsonar.projectKey=neuroguard-user-service -Dsonar.projectName="NeuroGuard - User Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
+                        sh 'mvn sonar:sonar -B -Dsonar.projectKey=neuroguard-user-service -Dsonar.projectName="NeuroGuard - User Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
                     }
                 }
             }
