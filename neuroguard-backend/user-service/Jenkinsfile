@@ -30,14 +30,6 @@ pipeline {
                     '''
                 }
             }
-            post {
-                always {
-                    junit "${SERVICE_DIR}/target/surefire-reports/*.xml"
-                    jacoco(execPattern: "${SERVICE_DIR}/target/jacoco.exec",
-                           classPattern: "${SERVICE_DIR}/target/classes",
-                           sourcePattern: "${SERVICE_DIR}/src/main/java")
-                }
-            }
         }
         stage('SonarQube Analysis') {
             steps {
