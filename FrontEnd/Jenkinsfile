@@ -32,7 +32,6 @@ pipeline {
             steps {
                 dir("${SERVICE_DIR}") {
                     sh 'npm ci --legacy-peer-deps'
-                    sh 'npm install lmdb --save-dev' 
                 }
             }
         }
