@@ -56,27 +56,51 @@ pipeline {
             }
         }
         stage('Push to DockerHub') {
-            steps {
-                echo "🚀 Pushing image to DockerHub..."
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    dir("${SERVICE_DIR}") {
-                        unstash 'docker-image'
-                        sh "docker load -i docker-image.tar"
-                        sh "docker image inspect ${DOCKER_IMAGE}:${DOCKER_TAG} >/dev/null"
+    steps {
+        echo '🚀 Pushing image to DockerHub...'
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
+                                          usernameVariable: 'DOCKER_USER', 
+                                          passwordVariable: 'DOCKER_PASS')]) {
+            dir("${SERVICE_DIR}") {
+                unstash 'docker-image'
+
+                // Load the image from tarball
+                sh 'docker load -i docker-image.tar'
+
+                // Verify Docker daemon is accessible (fails fast if permission denied)
+                sh 'docker info >/dev/null'
+
+                // Tag the image with the Docker Hub username (ensures push permissions)
+                sh """
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/user-service:${DOCKER_TAG}
+                """
+
+                // Login to Docker Hub
+                sh """
+                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                """
+
+                // Push with retry mechanism (up to 3 attempts, 5s delay)
+                script {
+                    retry(3) {
                         sh """
-                            echo "=== Login to DockerHub ==="
-                            echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
-
-                            echo "=== Pushing image tag ${DOCKER_TAG} ==="
-                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-
-                            echo "=== Logout from DockerHub ==="
-                            docker logout
+                            echo "=== Pushing image ${DOCKER_USER}/user-service:${DOCKER_TAG} ==="
+                            docker push ${DOCKER_USER}/user-service:${DOCKER_TAG}
                         """
                     }
                 }
+
+                // Logout (optional, but good practice)
+                sh 'docker logout'
+
+                // Cleanup local images to save disk space
+                sh """
+                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/user-service:${DOCKER_TAG} || true
+                """
             }
         }
+    }
+}
     }
     post { always { cleanWs() } }
 }
