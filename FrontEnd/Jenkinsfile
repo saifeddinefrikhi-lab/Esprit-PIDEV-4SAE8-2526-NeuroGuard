@@ -2,14 +2,13 @@ pipeline {
     agent any
 
     triggers {
-        pollSCM('H/5 * * * *')
+        githubPush()
     }
 
     environment {
         GIT_REPO       = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
         GIT_BRANCH     = 'main'
         SONAR_TOKEN    = credentials('sonar-token')
-        SONAR_HOST_URL = credentials('sonar-host-url')
         DOCKER_IMAGE   = "neuroguard/frontend"
         DOCKER_TAG     = "${env.BUILD_NUMBER}"
         SERVICE_DIR    = "FrontEnd"
@@ -95,7 +94,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
                 }
             }
         }
