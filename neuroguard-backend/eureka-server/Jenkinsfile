@@ -24,7 +24,27 @@ pipeline {
         stage('Build ') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean package -DskipTests -q"
+                    sh '''
+                        set +e
+                        for attempt in 1 2 3; do
+                            echo "Attempt $attempt/3: Building package..."
+                            mvn clean package -DskipTests -q \
+                                -Dmaven.wagon.http.ssl.insecure=true \
+                                -Dmaven.wagon.httpconnectionManager.ttlSecs=60 \
+                                --fail-at-end
+                            if [ $? -eq 0 ]; then
+                                set -e
+                                exit 0
+                            fi
+                            if [ $attempt -lt 3 ]; then
+                                echo "Build failed. Waiting 15 seconds before retry..."
+                                sleep 15
+                            fi
+                        done
+                        set -e
+                        echo "All 3 build attempts failed"
+                        exit 1
+                    '''
                 }
             }
         }
