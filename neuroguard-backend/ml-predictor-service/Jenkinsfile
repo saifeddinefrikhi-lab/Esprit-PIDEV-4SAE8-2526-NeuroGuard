@@ -1,25 +1,18 @@
 pipeline {
     agent any
-
     triggers {
         pollSCM('H/5 * * * *')
     }
-
     environment {
-        GIT_REPO       = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH     = 'main'
-        SONAR_TOKEN    = credentials('sonar-token')
-        SONAR_HOST_URL = credentials('sonar-host-url')
-        DOCKER_IMAGE   = "neuroguard/ml-predictor-service"
-        DOCKER_TAG     = "${env.BUILD_NUMBER}"
-        SERVICE_DIR    = "neuroguard-backend/ml-predictor-service"
+        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH   = 'main'
+        SONAR_TOKEN  = credentials('sonar-token')
+        DOCKER_IMAGE = "neuroguard/ml-predictor-service"
+        DOCKER_TAG   = "${env.BUILD_NUMBER}"
+        SERVICE_DIR  = "neuroguard-backend/ml-predictor-service"
+        MAVEN_OPTS   = "-Xmx1024m"
     }
-
-    options {
-        timeout(time: 30, unit: 'MINUTES')
-        disableConcurrentBuilds()
-    }
-
+    options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
         stage('Code Checkout') {
             steps {
@@ -27,71 +20,52 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
-
-        stage('Install Python dependencies') {
+        stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh '''
-                        python3 -m venv .venv
-                        . .venv/bin/activate
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
-                        pip install pytest pytest-cov
-                    '''
+                    sh "mvn clean test -B -q"
                 }
             }
         }
-
-        stage('Pytest Tests') {
+        stage('Build ') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh '''
-                        . .venv/bin/activate
-                        pytest test_api.py test_alzheimers_api.py -v \
-                            --junitxml=test-results.xml \
-                            --cov=. \
-                            --cov-report=xml:coverage.xml \
-                            --ignore=java-integration || true
-                    '''
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: "${SERVICE_DIR}/test-results.xml"
+                    sh "mvn clean package -DskipTests -q"
                 }
             }
         }
-
         stage('SonarQube Analysis') {
             steps {
                 dir("${SERVICE_DIR}") {
                     withSonarQubeEnv('SonarQube') {
-                        sh '''
-                            sonar-scanner \
-                                -Dsonar.projectKey=neuroguard-ml-predictor-service \
-                                -Dsonar.projectName="NeuroGuard - ML Predictor Service" \
-                                -Dsonar.sources=. \
-                                -Dsonar.python.coverage.reportPaths=coverage.xml \
-                                -Dsonar.python.xunit.reportPath=test-results.xml \
-                                -Dsonar.exclusions=**/__pycache__/**,**/data/**,*.pkl,*.png
-                        '''
+                        sh 'mvn sonar:sonar -B -q -Dsonar.projectKey=neuroguard-user-service -Dsonar.projectName="NeuroGuard - User Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
                     }
                 }
             }
         }
-
         stage('Quality Gate') {
-            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: false } }
+            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
         }
-
         stage('Build Docker Image') {
+            steps { dir("${SERVICE_DIR}") { sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ." } }
+        }
+        stage('Push to DockerHub') {
             steps {
-                dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
+                echo "🚀 Pushing image to DockerHub..."
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo "=== Login to DockerHub ==="
+                        echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
+
+                        echo "=== Pushing image ==="
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        echo "=== Logout from DockerHub ==="
+                        docker logout
+                    """
                 }
             }
         }
     }
-
     post { always { cleanWs() } }
 }
