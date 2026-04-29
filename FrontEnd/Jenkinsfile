@@ -32,6 +32,7 @@ pipeline {
             steps {
                 dir("${SERVICE_DIR}") {
                     sh 'npm ci --legacy-peer-deps'
+                    sh 'npm install lmdb --save-dev' 
                 }
             }
         }
@@ -51,23 +52,24 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                dir("${SERVICE_DIR}") {
-                    withSonarQubeEnv('SonarQube') {
-                        sh '''
-                            sonar-scanner \
-                                -Dsonar.projectKey=neuroguard-frontend \
-                                -Dsonar.projectName="NeuroGuard - Angular Frontend" \
-                                -Dsonar.sources=src \
-                                -Dsonar.tests=src/__tests__ \
-                                -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.exclusions=**/node_modules/**,**/*.spec.ts,**/coverage/**,**/.angular/**,**/dist/**
-                        '''
-                    }
-                }
+    steps {
+        dir("${SERVICE_DIR}") {
+            withSonarQubeEnv('SonarQube') {
+                sh '''
+                    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64   # adjust path to your Java 17 installation
+                    export PATH=$JAVA_HOME/bin:$PATH
+                    sonar-scanner \
+                        -Dsonar.projectKey=neuroguard-frontend \
+                        -Dsonar.projectName="NeuroGuard - Angular Frontend" \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src/__tests__ \
+                        -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.exclusions=**/node_modules/**,**/*.spec.ts,**/coverage/**,**/.angular/**,**/dist/**
+                '''
             }
         }
-
+    }
+}
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
