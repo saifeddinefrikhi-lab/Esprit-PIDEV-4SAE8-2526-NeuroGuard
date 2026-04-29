@@ -12,6 +12,7 @@ pipeline {
         DOCKER_IMAGE   = "neuroguard/frontend"
         DOCKER_TAG     = "${env.BUILD_NUMBER}"
         SERVICE_DIR    = "FrontEnd"
+        NODE_OPTIONS = '--max_old_space_size=4096'
     }
 
     options {
@@ -31,7 +32,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh 'npm ci --legacy-peer-deps'
+                    sh 'npm ci --legacy-peer-deps --omit=optional'
                 }
             }
         }
