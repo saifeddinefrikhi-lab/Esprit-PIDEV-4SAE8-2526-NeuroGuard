@@ -24,10 +24,25 @@ pipeline {
             steps {
                 dir("${SERVICE_DIR}") {
                     sh '''
-                        echo "⏭️  Skipping unit tests (no database available in Docker build)"
-                        echo "ℹ️  Integration tests are skipped with -DskipITs"
-                        echo "✅ Tests will be run in development/staging environments with database access"
-                        exit 0
+                        set +e
+                        for attempt in 1 2 3; do
+                            echo "Attempt $attempt/3: Running JUnit Tests..."
+                            mvn clean test -B -q -DskipITs \
+                                -Dmaven.wagon.http.ssl.insecure=true \
+                                -Dmaven.wagon.httpconnectionManager.ttlSecs=60 \
+                                --fail-at-end
+                            if [ $? -eq 0 ]; then
+                                set -e
+                                exit 0
+                            fi
+                            if [ $attempt -lt 3 ]; then
+                                echo "Tests failed. Waiting 15 seconds before retry..."
+                                sleep 15
+                            fi
+                        done
+                        set -e
+                        echo "All 3 test attempts failed"
+                        exit 1
                     '''
                 }
             }
@@ -74,8 +89,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
-                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest -o docker-image.tar"
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
                     stash name: 'docker-image', includes: 'docker-image.tar'
                 }
             }
@@ -87,13 +102,13 @@ pipeline {
                     dir("${SERVICE_DIR}") {
                         unstash 'docker-image'
                         sh "docker load -i docker-image.tar"
-                        sh "docker image inspect ${DOCKER_IMAGE}:latest >/dev/null"
+                        sh "docker image inspect ${DOCKER_IMAGE}:${DOCKER_TAG} >/dev/null"
                         sh """
                             echo "=== Login to DockerHub ==="
                             echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
 
-                            echo "=== Pushing image tag latest ==="
-                            docker push ${DOCKER_IMAGE}:latest
+                            echo "=== Pushing image tag ${DOCKER_TAG} ==="
+                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 
                             echo "=== Logout from DockerHub ==="
                             docker logout
