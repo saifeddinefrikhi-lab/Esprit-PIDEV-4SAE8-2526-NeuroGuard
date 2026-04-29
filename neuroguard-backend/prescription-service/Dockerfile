@@ -6,7 +6,7 @@ RUN mvn -B -DskipTests clean package
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 COPY --from=build /app/target/*.jar app.jar
 USER appuser
 EXPOSE 8080
