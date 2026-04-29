@@ -1,53 +1,44 @@
 pipeline {
     agent any
+
     triggers {
         githubPush()
     }
+
     environment {
-        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'main'
-        PYTHON_BIN   = 'python3'
-        DOCKER_IMAGE = "neuroguard/ml-predictor-service"
-        DOCKER_TAG   = "${env.BUILD_NUMBER}"
-        SERVICE_DIR  = "neuroguard-backend/ml-predictor-service"
-        APP_PORT     = '5000'
+        GIT_REPO = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH = 'main'
+        PYTHON_BIN = 'python3'
+        DOCKER_IMAGE = 'neuroguard/ml-predictor-service'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        SERVICE_DIR = 'neuroguard-backend/ml-predictor-service'
+        APP_PORT = '5000'
     }
-    options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
     stages {
         stage('Code Checkout') {
             steps {
-                git branch: "${GIT_BRANCH}",
-                steps {
-                    dir("${SERVICE_DIR}") {
-                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ."
-                        sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest -o docker-image.tar"
-                        stash name: 'docker-image', includes: 'docker-image.tar'
-                    }
-                }
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                        dir("${SERVICE_DIR}") {
-                            unstash 'docker-image'
-                            sh "docker load -i docker-image.tar"
-                            sh "docker image inspect ${DOCKER_IMAGE}:${DOCKER_TAG} >/dev/null"
-                            sh "docker image inspect ${DOCKER_IMAGE}:latest >/dev/null"
-                            sh """
-                                echo "=== Login to DockerHub ==="
-                                echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
-
-                                echo "=== Pushing image tag ${DOCKER_TAG} ==="
-                                docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-
-                                echo "=== Pushing image tag latest ==="
-                                docker push ${DOCKER_IMAGE}:latest
-
-                                echo "=== Logout from DockerHub ==="
-                                docker logout
-                            """
-                        }
+                dir("${SERVICE_DIR}") {
+                    sh '''
+                        ${PYTHON_BIN} -m venv .venv
+                        . .venv/bin/activate
+                        python -m pip install --upgrade pip
+                        pip install -r requirements.txt
+                    '''
+                }
+            }
+        }
 
         stage('Code Validation') {
             steps {
@@ -66,7 +57,6 @@ pipeline {
                     sh '''
                         . .venv/bin/activate
 
-                        # Ensure model artifacts exist before starting the service
                         if [ ! -f hospitalisation_model.pkl ] || [ ! -f feature_names.pkl ]; then
                             python create_mock_model.py
                         fi
@@ -121,60 +111,49 @@ pipeline {
             when {
                 expression { fileExists("${env.SERVICE_DIR}/.scannerwork/report-task.txt") }
             }
-            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
         }
 
         stage('Build Docker Image') {
-            steps { dir("${SERVICE_DIR}") { sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ." } }
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
+                    stash name: 'docker-image', includes: 'docker-image.tar'
+                }
+            }
         }
 
         stage('Push to DockerHub') {
-    steps {
-        echo '🚀 Pushing image to DockerHub...'
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
-                                          usernameVariable: 'DOCKER_USER', 
-                                          passwordVariable: 'DOCKER_PASS')]) {
-            dir("${SERVICE_DIR}") {
-                unstash 'docker-image'
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    dir("${SERVICE_DIR}") {
+                        unstash 'docker-image'
+                        sh 'docker load -i docker-image.tar'
+                        sh "docker image inspect ${DOCKER_IMAGE}:${DOCKER_TAG} >/dev/null"
+                        sh '''
+                            echo "=== Login to DockerHub ==="
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                // Load the image from tarball
-                sh 'docker load -i docker-image.tar'
+                            echo "=== Pushing image tag ${DOCKER_TAG} ==="
+                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 
-                // Verify Docker daemon is accessible (fails fast if permission denied)
-                sh 'docker info >/dev/null'
-
-                // Tag the image with the Docker Hub username (ensures push permissions)
-                sh """
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/ml-predictor-service:${DOCKER_TAG}
-                """
-
-                // Login to Docker Hub
-                sh """
-                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                """
-
-                // Push with retry mechanism (up to 3 attempts, 5s delay)
-                script {
-                    retry(3) {
-                        sh """
-                            echo "=== Pushing image ${DOCKER_USER}/ml-predictor-service:${DOCKER_TAG} ==="
-                            docker push ${DOCKER_USER}/ml-predictor-service:${DOCKER_TAG}
-                        """
+                            echo "=== Logout from DockerHub ==="
+                            docker logout
+                        '''
                     }
                 }
-
-                // Logout (optional, but good practice)
-                sh 'docker logout'
-
-                // Cleanup local images to save disk space
-                sh """
-                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/ml-predictor-service:${DOCKER_TAG} || true
-                """
             }
         }
     }
-}
-    }
 
-    post { always { cleanWs() } }
+    post {
+        always {
+            cleanWs()
+        }
+    }
 }
