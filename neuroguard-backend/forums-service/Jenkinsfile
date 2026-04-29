@@ -1,7 +1,7 @@
 pipeline {
     agent any
     triggers {
-        pollSCM('H/5 * * * *')
+        githubPush()
     }
     environment {
         GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'

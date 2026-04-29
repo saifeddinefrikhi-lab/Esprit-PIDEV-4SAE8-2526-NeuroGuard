@@ -1,16 +1,16 @@
 pipeline {
     agent any
     triggers {
-        pollSCM('H/5 * * * *')
+        githubPush()
     }
     environment {
         GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
         GIT_BRANCH   = 'main'
-        SONAR_TOKEN  = credentials('sonar-token')
+        PYTHON_BIN   = 'python3'
         DOCKER_IMAGE = "neuroguard/ml-predictor-service"
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
         SERVICE_DIR  = "neuroguard-backend/ml-predictor-service"
-        MAVEN_OPTS   = "-Xmx1024m"
+        APP_PORT     = '5000'
     }
     options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
@@ -20,35 +20,99 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
-        stage('JUnit Tests') {
+
+        stage('Install Dependencies') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q"
+                    sh '''
+                        ${PYTHON_BIN} -m venv .venv
+                        . .venv/bin/activate
+                        python -m pip install --upgrade pip
+                        pip install -r requirements.txt
+                    '''
                 }
             }
         }
-        stage('Build ') {
+
+        stage('Code Validation') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean package -DskipTests -q"
+                    sh '''
+                        . .venv/bin/activate
+                        python -m compileall .
+                    '''
                 }
             }
         }
+
+        stage('API Smoke Test') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh '''
+                        . .venv/bin/activate
+
+                        # Ensure model artifacts exist before starting the service
+                        if [ ! -f hospitalisation_model.pkl ] || [ ! -f feature_names.pkl ]; then
+                            python create_mock_model.py
+                        fi
+
+                        python app.py > app.log 2>&1 &
+                        APP_PID=$!
+
+                        for i in 1 2 3 4 5 6 7 8 9 10; do
+                            if curl -fsS "http://localhost:${APP_PORT}/health" > /dev/null; then
+                                echo "Health check passed"
+                                kill ${APP_PID}
+                                wait ${APP_PID} || true
+                                exit 0
+                            fi
+                            sleep 2
+                        done
+
+                        echo "Health check failed. Last logs:"
+                        tail -n 100 app.log || true
+                        kill ${APP_PID} || true
+                        wait ${APP_PID} || true
+                        exit 1
+                    '''
+                }
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 dir("${SERVICE_DIR}") {
                     withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar -B -q -Dsonar.projectKey=neuroguard-user-service -Dsonar.projectName="NeuroGuard - User Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
+                        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                            sh '''
+                                if command -v sonar-scanner >/dev/null 2>&1; then
+                                    sonar-scanner \
+                                      -Dsonar.projectKey=neuroguard-ml-predictor-service \
+                                      -Dsonar.projectName="NeuroGuard - ML Predictor Service" \
+                                      -Dsonar.sources=. \
+                                      -Dsonar.python.version=3.10 \
+                                      -Dsonar.token=${SONAR_TOKEN}
+                                else
+                                    echo "sonar-scanner not found on this Jenkins agent, skipping SonarQube analysis."
+                                fi
+                            '''
+                        }
                     }
                 }
             }
         }
+
         stage('Quality Gate') {
+            when {
+                expression { fileExists("${env.SERVICE_DIR}/.scannerwork/report-task.txt") }
+            }
             steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
         }
+
         stage('Build Docker Image') {
             steps { dir("${SERVICE_DIR}") { sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ." } }
         }
+
         stage('Push to DockerHub') {
             steps {
                 echo "🚀 Pushing image to DockerHub..."
@@ -67,5 +131,6 @@ pipeline {
             }
         }
     }
+
     post { always { cleanWs() } }
 }

@@ -1,7 +1,7 @@
 pipeline {
     agent any
     triggers {
-        pollSCM('H/5 * * * *')
+        githubPush()
     }
     environment {
         GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
@@ -10,6 +10,7 @@ pipeline {
         DOCKER_IMAGE = "neuroguard/reservation-service"
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
         SERVICE_DIR  = "neuroguard-backend/reservation-service"
+        MAVEN_OPTS   = "-Xmx1024m"
     }
     options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
@@ -19,23 +20,17 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
-        stage('Build & JUnit Tests') {
+        stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh '''
-                        mvn clean verify -B \
-                            -Dspring.datasource.url=jdbc:h2:mem:testdb \
-                            -Dspring.datasource.driver-class-name=org.h2.Driver \
-                            -Dspring.jpa.database-platform=org.hibernate.dialect.H2Dialect
-                    '''
+                    sh "mvn clean test -B -q"
                 }
             }
-            post {
-                always {
-                    junit "${SERVICE_DIR}/target/surefire-reports/*.xml"
-                    jacoco(execPattern: "${SERVICE_DIR}/target/jacoco.exec",
-                           classPattern: "${SERVICE_DIR}/target/classes",
-                           sourcePattern: "${SERVICE_DIR}/src/main/java")
+        }
+        stage('Build ') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "mvn clean package -DskipTests -q"
                 }
             }
         }
@@ -43,7 +38,7 @@ pipeline {
             steps {
                 dir("${SERVICE_DIR}") {
                     withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar -B -Dsonar.projectKey=neuroguard-reservation-service -Dsonar.projectName="NeuroGuard - Reservation Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
+                        sh 'mvn sonar:sonar -B -q -Dsonar.projectKey=neuroguard-reservation-service -Dsonar.projectName="NeuroGuard - Reservation Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
                     }
                 }
             }
@@ -53,6 +48,23 @@ pipeline {
         }
         stage('Build Docker Image') {
             steps { dir("${SERVICE_DIR}") { sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -t ${DOCKER_IMAGE}:latest ." } }
+        }
+        stage('Push to DockerHub') {
+            steps {
+                echo "🚀 Pushing image to DockerHub..."
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo "=== Login to DockerHub ==="
+                        echo "\${DOCKER_PASS}" | docker login -u "\${DOCKER_USER}" --password-stdin
+
+                        echo "=== Pushing image ==="
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        echo "=== Logout from DockerHub ==="
+                        docker logout
+                    """
+                }
+            }
         }
     }
     post { always { cleanWs() } }
