@@ -55,13 +55,17 @@ pipeline {
 }
 
         stage('SonarQube Analysis') {
+    agent {
+        docker {
+            image 'sonarsource/sonar-scanner-cli:latest'
+            reuseNode true
+        }
+    }
     steps {
         dir("${SERVICE_DIR}") {
             withSonarQubeEnv('SonarQube') {
                 sh '''
-                    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-                    export PATH=$JAVA_HOME/bin:$PATH
-                    /opt/sonar-scanner/bin/sonar-scanner \
+                    sonar-scanner \
                         -Dsonar.projectKey=neuroguard-frontend \
                         -Dsonar.projectName="NeuroGuard - Angular Frontend" \
                         -Dsonar.sources=src \
