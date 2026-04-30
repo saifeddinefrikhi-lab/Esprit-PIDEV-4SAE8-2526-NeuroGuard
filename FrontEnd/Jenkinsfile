@@ -59,8 +59,7 @@ pipeline {
         dir("${SERVICE_DIR}") {
             withSonarQubeEnv('SonarQube') {
                 sh '''
-                    export SONAR_SCANNER_OPTS="-Djava.home=/usr/lib/jvm/java-17-openjdk-amd64"
-                    sonar-scanner \
+                    /opt/sonar-scanner/bin/sonar-scanner \
                         -Dsonar.projectKey=neuroguard-frontend \
                         -Dsonar.projectName="NeuroGuard - Angular Frontend" \
                         -Dsonar.sources=src \
