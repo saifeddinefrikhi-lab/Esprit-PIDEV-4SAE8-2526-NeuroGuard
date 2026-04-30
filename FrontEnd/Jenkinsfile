@@ -39,7 +39,7 @@ pipeline {
 
         stage('Karma Unit Tests') {
     environment {
-        CHROME_BIN = '/usr/bin/chromium-browser'
+        CHROME_BIN = '/usr/bin/google-chrome'
     }
     steps {
         dir("${SERVICE_DIR}") {
