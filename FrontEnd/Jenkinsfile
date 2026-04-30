@@ -54,18 +54,12 @@ pipeline {
     }
 }
 
-        stage('SonarQube Analysis') {
-    agent {
-        docker {
-            image 'sonarsource/sonar-scanner-cli:latest'
-            reuseNode true
-        }
-    }
+       stage('SonarQube Analysis') {
     steps {
         dir("${SERVICE_DIR}") {
             withSonarQubeEnv('SonarQube') {
                 sh '''
-                    sonar-scanner \
+                    /opt/sonar-scanner/bin/sonar-scanner \
                         -Dsonar.projectKey=neuroguard-frontend \
                         -Dsonar.projectName="NeuroGuard - Angular Frontend" \
                         -Dsonar.sources=src \
