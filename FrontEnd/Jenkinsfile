@@ -38,26 +38,28 @@ pipeline {
         }
 
         stage('Karma Unit Tests') {
-            steps {
-                dir("${SERVICE_DIR}") {
-                    sh 'npm run test -- --watch=false --code-coverage || true'
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true,
-                          testResults: "${SERVICE_DIR}/test-results/karma-results.xml"
-                }
-            }
+    environment {
+        CHROME_BIN = '/usr/bin/chromium-browser'
+    }
+    steps {
+        dir("${SERVICE_DIR}") {
+            sh 'npm run test -- --watch=false --code-coverage || true'
         }
+    }
+    post {
+        always {
+            junit allowEmptyResults: true,
+                  testResults: "${SERVICE_DIR}/test-results/karma-results.xml"
+        }
+    }
+}
 
         stage('SonarQube Analysis') {
     steps {
         dir("${SERVICE_DIR}") {
             withSonarQubeEnv('SonarQube') {
                 sh '''
-                    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64   # adjust path to your Java 17 installation
-                    export PATH=$JAVA_HOME/bin:$PATH
+                    export SONAR_SCANNER_OPTS="-Djava.home=/usr/lib/jvm/java-17-openjdk-amd64"
                     sonar-scanner \
                         -Dsonar.projectKey=neuroguard-frontend \
                         -Dsonar.projectName="NeuroGuard - Angular Frontend" \
