@@ -1,8 +1,12 @@
 <div class="container-fluid px-4 mt-0 mb-5">
-  <div class="sticky-action" *ngIf="canCreate">
+  <div class="sticky-action d-flex align-items-center gap-2 mb-4" *ngIf="canCreate">
     <button class="btn-modern btn-add" (click)="onAdd()">
       <i class="ti ti-plus"></i>
       <span>New Care Plan</span>
+    </button>
+    <button class="btn-modern btn-add ms-2" [routerLink]="['/provider/care-plans/ml-recommendation']" style="background-color: var(--bs-primary);">
+      <i class="ti ti-brain"></i>
+      <span>Generate ML Care Plan</span>
     </button>
   </div>
 

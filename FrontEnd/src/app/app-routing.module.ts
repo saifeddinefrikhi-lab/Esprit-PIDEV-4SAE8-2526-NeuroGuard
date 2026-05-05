@@ -332,6 +332,10 @@ export const routes: Routes = [
         loadComponent: () => import('./Front-office/healthcare-provider/care-plan/care-plan-list/care-plan-list.component').then((c) => c.CarePlanListComponent)
       },
       {
+        path: 'provider/care-plans/ml-recommendation',
+        loadComponent: () => import('./Front-office/healthcare-provider/care-plan/care-plan-ml-recommendation/care-plan-ml-recommendation.component').then((c) => c.CarePlanMlRecommendationComponent)
+      },
+      {
         path: 'provider/care-plans/new',
         loadComponent: () => import('./Front-office/healthcare-provider/care-plan/care-plan-form/care-plan-form.component').then((c) => c.CarePlanFormComponent)
       },
