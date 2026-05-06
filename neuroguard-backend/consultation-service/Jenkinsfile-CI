@@ -21,9 +21,21 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
+        stage('Compile (fast)') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    echo '⚙️  Compiling project (skip tests)...'
+                    dir("${SERVICE_DIR}") {
+                        sh "mvn -DskipTests package -B"
+                    }
+                    echo '✅ Compile completed'
+                }
+            }
+        }
+
         stage('Unit Tests') {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     echo '🧪 Starting fast Mockito unit tests...'
                     dir("${SERVICE_DIR}") {
                         sh "mvn test -B -Dtest=ConsultationServiceTests,AvailabilityServiceTests -DforkCount=1"
