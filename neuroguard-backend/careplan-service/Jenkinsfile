@@ -24,7 +24,7 @@ pipeline {
         stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q -DforkCount=0"
+                    sh "mvn clean test -B -DforkCount=0"
                 }
             }
             post {
@@ -55,7 +55,7 @@ pipeline {
         }
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 15, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
