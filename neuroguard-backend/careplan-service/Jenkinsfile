@@ -64,16 +64,27 @@ pipeline {
             steps {
                 echo '✅ CI passed – triggering CD pipeline...'
                 script {
-                    def cdJobName = env.JOB_NAME.replaceFirst(/^CI_/, 'CD_')
+                    // Déclenche le pipeline CD après succès du CI
+                    def cdJobName = env.JOB_NAME.replaceFirst(/Jenkinsfile$/, 'Jenkinsfile-CD')
+                    echo "Triggering job: ${cdJobName}"
                     build job: cdJobName,
-                          parameters: [string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}")],
-                          wait: false
+                          parameters: [
+                              string(name: 'BUILD_NUMBER', value: "${BUILD_NUMBER}"),
+                              string(name: 'DOCKER_TAG', value: "build-${BUILD_NUMBER}")
+                          ],
+                          wait: false,
+                          propagate: false
                 }
             }
         }
     }
     post {
         always { cleanWs() }
-        failure { echo '❌ CI pipeline failed – CD will NOT be triggered.' }
+        success {
+            echo '✅ CI pipeline completed successfully'
+        }
+        failure { 
+            echo '❌ CI pipeline failed – CD will NOT be triggered.' 
+        }
     }
 }
