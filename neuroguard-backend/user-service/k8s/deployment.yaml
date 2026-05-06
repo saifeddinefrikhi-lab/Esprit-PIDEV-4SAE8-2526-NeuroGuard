@@ -5,7 +5,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: user-service
@@ -24,3 +24,7 @@ spec:
               value: root
             - name: DB_PASSWORD
               value: root
+            - name: EUREKA_REGISTER
+              value: "false"
+            - name: EUREKA_FETCH
+              value: "false"
