@@ -78,12 +78,11 @@ pipeline {
                         def cdJobName = null
                         
                         // Pattern 1: Si le job contient le chemin (ex: neuroguard-backend/careplan-service/hamza)
-                        if (env.JOB_NAME.contains('/')) {
-                            cdJobName = env.JOB_NAME.replaceFirst(/\/[^/]*$/, '/careplan-service-cd')
-                        } else {
-                            // Pattern 2: Sinon, chercher un job avec suffixe -cd
-                            cdJobName = env.JOB_NAME.replaceAll(/(-ci)?$/, '-cd')
-                        }
+                       if (env.JOB_NAME.contains('/')) {
+    cdJobName = env.JOB_NAME.replaceFirst(".*/", "careplan-service/")
+} else {
+    cdJobName = env.JOB_NAME.replaceAll("(-ci)?\$", "-cd")
+}
                         
                         echo "Current Job: ${env.JOB_NAME}"
                         echo "Target CD Job: ${cdJobName}"
