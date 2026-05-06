@@ -32,17 +32,13 @@ pipeline {
 
     stages {
 
-        stage('Code Checkout') {
+        stage('Display Branch Info') {
             steps {
                 script {
-                    // Get branch name from various Jenkins environment variables
+                    // Get and display branch name from various Jenkins environment variables
                     def branchName = env.BRANCH_NAME ?: env.CHANGE_BRANCH ?: env.GIT_BRANCH ?: 'jihenedevops'
-                    echo "Using branch: ${branchName}"
-                    
-                    // Checkout the specific branch
-                    git branch: branchName,
-                        url: "${GIT_REPO}",
-                        credentialsId: 'jiheneGithub'
+                    echo "Current branch: ${branchName}"
+                    echo "Build number: ${env.BUILD_NUMBER}"
                 }
             }
         }
