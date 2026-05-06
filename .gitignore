@@ -45,3 +45,14 @@ dist/
 # Misc
 test.txt
 *.class
+
+# Python
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
