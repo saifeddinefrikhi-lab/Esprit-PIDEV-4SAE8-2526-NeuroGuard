@@ -165,7 +165,7 @@
 				<version>3.1.2</version>
 				<configuration>
 					<skipTests>${skipTests}</skipTests>
-					<argLine>-Xmx512m -XX:+UseG1GC</argLine>
+					<argLine>@{argLine} -Xmx512m -XX:+UseG1GC</argLine>
 					<systemPropertyVariables>
 						<org.slf4j.simpleLogger.defaultLogLevel>WARN</org.slf4j.simpleLogger.defaultLogLevel>
 						<junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
