@@ -21,10 +21,23 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
-        stage('JUnit Tests') {
+        stage('Unit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q -DforkCount=0"
+                    sh "mvn clean test -B -q -Dtest=ConsultationServiceTests,AvailabilityServiceTests"
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
+                }
+            }
+        }
+        stage('Spring Context Smoke Test') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "mvn test -B -q -Dtest=ConsultationServiceApplicationTests"
                 }
             }
             post {
