@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reservation-service-config
+  namespace: neuroguard
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/reservationdb?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC"
+  SPRING_DATASOURCE_USERNAME: "root"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_SHOW_SQL: "false"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka"
+  SERVER_PORT: "8087"

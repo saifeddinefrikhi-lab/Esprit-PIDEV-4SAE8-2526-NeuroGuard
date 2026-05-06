@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assurance-service
+  namespace: neuroguard
+  labels:
+    app: assurance-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: assurance-service
+  template:
+    metadata:
+      labels:
+        app: assurance-service
+    spec:
+      containers:
+        - name: assurance-service
+          image: YOUR_DOCKERHUB_USER/assurance-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8091
+          envFrom:
+            - configMapRef:
+                name: assurance-service-config
+            - secretRef:
+                name: assurance-service-secret
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
