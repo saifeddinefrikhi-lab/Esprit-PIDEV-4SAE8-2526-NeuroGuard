@@ -57,6 +57,7 @@ pipeline {
                             mvn sonar:sonar -B \
                             -Dsonar.projectKey=neuroguard-forum-service \
                             -Dsonar.projectName="NeuroGuard - Forum Service" \
+                            -Dsonar.login=$SONAR_TOKEN \
                             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                         '''
                     }
