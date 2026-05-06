@@ -1,13 +1,18 @@
-FROM eclipse-temurin:17-jdk-alpine AS build
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+
 WORKDIR /app
+
 COPY pom.xml .
 COPY src ./src
-RUN apk add --no-cache maven && mvn clean package -DskipTests -B
 
-FROM eclipse-temurin:17-jre-alpine
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:17-jre
+
 WORKDIR /app
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 COPY --from=build /app/target/*.jar app.jar
-USER appuser
+
 EXPOSE 8081
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["java","-jar","app.jar"]
