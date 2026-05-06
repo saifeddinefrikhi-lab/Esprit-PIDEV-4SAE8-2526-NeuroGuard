@@ -4,16 +4,16 @@ pipeline {
         githubPush()
     }
     environment {
-        // Use SMB shared bare repository
-        GIT_REPO     = 'file://///192.168.12.11/neuroguard-mirror'
-        GIT_BRANCH   = 'main'
-        SONAR_TOKEN  = credentials('sonar-token')
-        DOCKER_IMAGE = "neuroguard/careplan-service"
-        DOCKER_TAG   = "${env.BUILD_NUMBER}"
-        SERVICE_DIR  = "neuroguard-backend/careplan-service"
-        MAVEN_OPTS   = "-Xmx1024m"
+        GIT_REPO    = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH  = 'main'
+        SONAR_TOKEN = credentials('sonar-token')
+        SERVICE_DIR = "neuroguard-backend/careplan-service"
+        MAVEN_OPTS  = "-Xmx1024m"
     }
-    options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
     stages {
         stage('Code Checkout') {
             steps {
@@ -24,101 +24,56 @@ pipeline {
         stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q"
+                    sh "mvn clean test -B -q -DforkCount=0"
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
                 }
             }
         }
-        stage('Build ') {
+        stage('Build') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean package -DskipTests -q"
+                    sh "mvn package -DskipTests -B"
                 }
             }
         }
         stage('SonarQube Analysis') {
-    steps {
-        dir("${SERVICE_DIR}") {
-            withSonarQubeEnv('SonarQube') {
-                sh """
-                    mvn sonar:sonar \
-                    -Dsonar.projectKey=neuroguard-careplan-service \
-                    -Dsonar.projectName="NeuroGuard - CarePlan Service" \
-                    -Dsonar.login=$SONAR_TOKEN \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                """
-            }
-        }
-    }
-}
-        stage('Quality Gate') {
-            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
-        }
-        stage('Build Docker Image') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
-                    stash name: 'docker-image', includes: 'docker-image.tar'
-                }
-            }
-        }
-        stage('Push to DockerHub') {
-    steps {
-        echo '🚀 Pushing image to DockerHub...'
-        withCredentials([usernamePassword(credentialsId: 'docker-hub', 
-                                          usernameVariable: 'DOCKER_USER', 
-                                          passwordVariable: 'DOCKER_PASS')]) {
-            dir("${SERVICE_DIR}") {
-                unstash 'docker-image'
-
-                // Load the image from tarball
-                sh 'docker load -i docker-image.tar'
-
-                // Verify Docker daemon is accessible (fails fast if permission denied)
-                sh 'docker info >/dev/null'
-
-                // Tag the image with the Docker Hub username (ensures push permissions)
-                sh """
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
-                """
-
-                // Login to Docker Hub
-                sh """
-                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                """
-
-                // Push with retry mechanism (up to 3 attempts, 5s delay)
-                script {
-                    retry(3) {
-                        sh """
-                            echo "=== Pushing image ${DOCKER_USER}/careplan-service:${DOCKER_TAG} ==="
-                            docker push ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
-                        """
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''mvn sonar:sonar -B -q \
+                            -Dsonar.projectKey=neuroguard-careplan-service \
+                            -Dsonar.projectName="NeuroGuard - CarePlan Service" \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'''
                     }
                 }
-
-                // Logout (optional, but good practice)
-                sh 'docker logout'
-
-                // Cleanup local images to save disk space
-                sh """
-                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/careplan-service:${DOCKER_TAG} || true
-                """
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('Trigger CD Pipeline') {
+            steps {
+                echo '✅ CI passed – triggering CD pipeline...'
+                script {
+                    def cdJobName = env.JOB_NAME.replaceFirst(/^CI_/, 'CD_')
+                    build job: cdJobName,
+                          parameters: [string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}")],
+                          wait: false
+                }
             }
         }
     }
-}
-    }
-    post { 
-        success {
-            // Déclencher la pipeline CD après succès de la CI
-            build job: 'careplan-service-CD', 
-                  parameters: [
-                      string(name: 'BUILD_NUMBER', value: "${env.BUILD_NUMBER}"),
-                      string(name: 'DOCKER_TAG', value: "${env.BUILD_NUMBER}")
-                  ],
-                  wait: false
-        }
-        always { cleanWs() } 
+    post {
+        always { cleanWs() }
+        failure { echo '❌ CI pipeline failed – CD will NOT be triggered.' }
     }
 }
