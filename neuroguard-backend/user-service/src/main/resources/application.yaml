@@ -2,7 +2,7 @@ spring:
   application:
     name: user-service  # Name of the service registered in Eureka
   datasource:
-    url: jdbc:mysql://localhost:3306/userdb?createDatabaseIfNotExist=true
+    url: jdbc:mysql://mysql-user-service:3306/userdb?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
