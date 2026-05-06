@@ -10,6 +10,7 @@ import com.neuroguard.consultationservice.repository.ProviderAvailabilityReposit
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -53,6 +54,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should create availability successfully")
     void testCreateAvailability_Success() {
         // Arrange
@@ -74,6 +76,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should reject availability with invalid times")
     void testCreateAvailability_InvalidTimes() {
         // Arrange
@@ -89,6 +92,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should update availability successfully")
     void testUpdateAvailability_Success() {
         // Arrange
@@ -113,6 +117,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should prevent unauthorized user from updating availability")
     void testUpdateAvailability_Unauthorized() {
         // Arrange
@@ -128,6 +133,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should throw ResourceNotFoundException for non-existent availability")
     void testUpdateAvailability_NotFound() {
         // Arrange
@@ -140,6 +146,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should delete availability successfully")
     void testDeleteAvailability_Success() {
         // Arrange
@@ -158,6 +165,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should prevent unauthorized deletion")
     void testDeleteAvailability_Unauthorized() {
         // Arrange
@@ -171,6 +179,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should retrieve availabilities by provider")
     void testGetByProvider_Success() {
         // Arrange

@@ -23,11 +23,13 @@ pipeline {
         }
         stage('Unit Tests') {
             steps {
-                echo '🧪 Starting fast Mockito unit tests...'
-                dir("${SERVICE_DIR}") {
-                    sh "mvn test -B -Dtest=ConsultationServiceTests,AvailabilityServiceTests -DforkCount=1"
+                timeout(time: 2, unit: 'MINUTES') {
+                    echo '🧪 Starting fast Mockito unit tests...'
+                    dir("${SERVICE_DIR}") {
+                        sh "mvn test -B -Dtest=ConsultationServiceTests,AvailabilityServiceTests -DforkCount=1"
+                    }
+                    echo '✅ Mockito unit tests passed'
                 }
-                echo '✅ Mockito unit tests passed'
             }
             post {
                 always {

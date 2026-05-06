@@ -12,6 +12,7 @@ import com.neuroguard.consultationservice.repository.ProviderAvailabilityReposit
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -76,6 +77,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should retrieve consultations by patient")
     void testGetConsultationsByPatient_Success() {
         // Arrange
@@ -93,6 +95,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should return empty list when patient has null ID")
     void testGetConsultationsByPatient_NullId() {
         // Act
@@ -103,6 +106,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should retrieve consultations by provider")
     void testGetConsultationsByProvider_Success() {
         // Arrange
@@ -120,6 +124,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should return empty list when provider has null ID")
     void testGetConsultationsByProvider_NullId() {
         // Act
@@ -130,6 +135,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should retrieve all consultations")
     void testGetAllConsultations_Success() {
         // Arrange
@@ -146,6 +152,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should return empty list when no consultations exist")
     void testGetAllConsultations_Empty() {
         // Arrange
@@ -159,6 +166,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should delete consultation successfully")
     void testDeleteConsultation_Success() {
         // Arrange
@@ -174,6 +182,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should throw ResourceNotFoundException when deleting non-existent consultation")
     void testDeleteConsultation_NotFound() {
         // Arrange
@@ -186,6 +195,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should throw UnauthorizedException for unauthorized deletion")
     void testDeleteConsultation_Unauthorized() {
         // Arrange
@@ -198,6 +208,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should retrieve caregiver's consultations")
     void testGetConsultationsByCaregiver_Success() {
         // Arrange
@@ -216,6 +227,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should return empty list when caregiver has null ID")
     void testGetConsultationsByCaregiver_NullId() {
         // Act
@@ -226,6 +238,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should handle null PatientId in request")
     void testGetConsultationsByPatient_NullFromFilter() {
         // Act
@@ -237,6 +250,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should get join link for online consultation")
     void testGetJoinLink_Success() {
         // Arrange
@@ -254,6 +268,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should throw exception when getting join link for non-existent consultation")
     void testGetJoinLink_NotFound() {
         // Arrange
@@ -266,6 +281,7 @@ class ConsultationServiceTests {
     }
 
     @Test
+    @Timeout(1)
     @DisplayName("Should prevent unauthorized access to join link")
     void testGetJoinLink_Unauthorized_Provider() {
         // Arrange
