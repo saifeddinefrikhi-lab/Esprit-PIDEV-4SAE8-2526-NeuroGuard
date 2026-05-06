@@ -1,106 +1,266 @@
 pipeline {
     agent any
+
     triggers {
         githubPush()
     }
+
     environment {
-        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'main'
-        SONAR_TOKEN  = credentials('sonar-token')
-        DOCKER_IMAGE = "neuroguard/forums-service"
+
+        GIT_REPO = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+
+        SERVICE_DIR = 'neuroguard-backend/user-service'
+
+        SONAR_TOKEN = credentials('sonar-token')
+
+        DOCKER_IMAGE = 'neuroguard/user-service'
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
-        SERVICE_DIR  = "neuroguard-backend/forums-service"
-        MAVEN_OPTS   = "-Xmx1024m"
+
+        MAVEN_OPTS = '-Xmx1024m'
+
+        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
+
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+
+        KUBECONFIG = '/home/damiano/.kube/config'
     }
-    options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
     stages {
+
         stage('Code Checkout') {
             steps {
-                git branch: "${GIT_BRANCH}",
-                    url: "${GIT_REPO}"
+
+                echo 'Source code already checked out by Jenkins SCM'
+
+                sh 'git branch -a'
+
+                sh 'git log -1 --oneline'
             }
         }
-        stage('JUnit Tests') {
+
+        stage('Check Tools') {
             steps {
+
+                sh 'java -version'
+
+                sh 'mvn -version'
+
+                sh 'git --version'
+
+                sh 'docker --version'
+
+                sh 'kubectl version --client'
+
+                sh 'kubectl get nodes'
+
+                sh 'helm version || true'
+            }
+        }
+
+        stage('Test + JaCoCo + Build') {
+            steps {
+
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q"
+
+                    sh 'mvn clean verify -B'
+
+                    sh 'find target -name "jacoco*" || true'
+
+                    sh 'test -f target/site/jacoco/jacoco.xml || true'
+
+                    sh 'test -f target/site/jacoco/index.html || true'
                 }
             }
         }
-        stage('Build ') {
-            steps {
-                dir("${SERVICE_DIR}") {
-                    sh "mvn clean package -DskipTests -q"
-                }
-            }
-        }
+
         stage('SonarQube Analysis') {
             steps {
+
                 dir("${SERVICE_DIR}") {
+
                     withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar -B -q -Dsonar.projectKey=neuroguard-forums-service -Dsonar.projectName="NeuroGuard - Forums Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
+
+                        sh '''
+                            mvn sonar:sonar -B \
+                            -Dsonar.projectKey=neuroguard-user-service \
+                            -Dsonar.projectName="NeuroGuard - User Service" \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                        '''
                     }
                 }
             }
         }
-        stage('Quality Gate') {
-            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
-        }
-        stage('Build Docker Image') {
+
+        stage('Publish JaCoCo Report') {
             steps {
-                dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
-                    stash name: 'docker-image', includes: 'docker-image.tar'
+
+                publishHTML(target: [
+                    reportDir: "${SERVICE_DIR}/target/site/jacoco",
+                    reportFiles: 'index.html',
+                    reportName: 'JaCoCo Coverage Report',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing: true
+                ])
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+
+                timeout(time: 5, unit: 'MINUTES') {
+
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
+
+        stage('Build Docker Image') {
+            steps {
+
+                dir("${SERVICE_DIR}") {
+
+                    sh """
+                        docker build \
+                        -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    """
+
+                    sh """
+                        docker save \
+                        ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                        -o docker-image.tar
+                    """
+
+                    stash name: 'docker-image',
+                          includes: 'docker-image.tar'
+                }
+            }
+        }
+
         stage('Push to DockerHub') {
-    steps {
-        echo '🚀 Pushing image to DockerHub...'
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
-                                          usernameVariable: 'DOCKER_USER', 
-                                          passwordVariable: 'DOCKER_PASS')]) {
-            dir("${SERVICE_DIR}") {
-                unstash 'docker-image'
+            steps {
 
-                // Load the image from tarball
-                sh 'docker load -i docker-image.tar'
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-cred',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
 
-                // Verify Docker daemon is accessible (fails fast if permission denied)
-                sh 'docker info >/dev/null'
+                    dir("${SERVICE_DIR}") {
 
-                // Tag the image with the Docker Hub username (ensures push permissions)
-                sh """
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/forums-service:${DOCKER_TAG}
-                """
+                        unstash 'docker-image'
 
-                // Login to Docker Hub
-                sh """
-                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                """
+                        sh 'docker load -i docker-image.tar'
 
-                // Push with retry mechanism (up to 3 attempts, 5s delay)
-                script {
-                    retry(3) {
                         sh """
-                            echo "=== Pushing image ${DOCKER_USER}/forums-service:${DOCKER_TAG} ==="
-                            docker push ${DOCKER_USER}/forums-service:${DOCKER_TAG}
+                            docker tag \
+                            ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                            ${DOCKER_USER}/user-service:${DOCKER_TAG}
+                        """
+
+                        sh '''
+                            echo "$DOCKER_PASS" | \
+                            docker login -u "$DOCKER_USER" --password-stdin
+                        '''
+
+                        retry(3) {
+
+                            sh """
+                                docker push \
+                                ${DOCKER_USER}/user-service:${DOCKER_TAG}
+                            """
+                        }
+
+                        sh 'docker logout'
+
+                        sh """
+                            docker rmi \
+                            ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                            ${DOCKER_USER}/user-service:${DOCKER_TAG} || true
                         """
                     }
                 }
+            }
+        }
 
-                // Logout (optional, but good practice)
-                sh 'docker logout'
+        stage('Deploy to Kubernetes') {
+            steps {
 
-                // Cleanup local images to save disk space
-                sh """
-                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/forums-service:${DOCKER_TAG} || true
-                """
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-cred',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+
+                    dir("${SERVICE_DIR}") {
+
+                        sh 'kubectl apply -f k8s/mysql.yaml'
+
+                        sh 'kubectl apply -f k8s/deployment.yaml'
+
+                        sh 'kubectl apply -f k8s/service.yaml'
+
+                        sh 'kubectl apply -f k8s/servicemonitor.yaml'
+
+                        sh """
+                            kubectl set image deployment/user-service \
+                            user-service=${DOCKER_USER}/user-service:${DOCKER_TAG}
+                        """
+
+                        sh '''
+                            kubectl rollout status deployment/user-service \
+                            --timeout=180s
+                        '''
+
+                        sh 'kubectl get pods'
+
+                        sh 'kubectl get svc'
+                    }
+                }
+            }
+        }
+
+        stage('Verify Prometheus Monitoring') {
+            steps {
+
+                sh 'kubectl get namespace monitoring || true'
+
+                sh 'kubectl get servicemonitor -n monitoring || true'
+
+                sh '''
+                    kubectl describe servicemonitor \
+                    user-service-monitor \
+                    -n monitoring || true
+                '''
+
+                sh 'kubectl get pods -n monitoring || true'
+
+                sh 'kubectl get svc -n monitoring || true'
             }
         }
     }
-}
+
+    post {
+
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+
+        failure {
+            echo 'Pipeline failed!'
+        }
+
+        always {
+            cleanWs()
+        }
     }
-    post { always { cleanWs() } }
 }
