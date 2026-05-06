@@ -164,7 +164,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.1.2</version>
 				<configuration>
-					<skipTests>false</skipTests>
+					<skipTests>${skipTests}</skipTests>
 					<argLine>-Xmx512m -XX:+UseG1GC</argLine>
 					<systemPropertyVariables>
 						<org.slf4j.simpleLogger.defaultLogLevel>WARN</org.slf4j.simpleLogger.defaultLogLevel>
