@@ -28,6 +28,35 @@ pipeline {
             }
         }
         
+        stage('Build') {
+            steps {
+                echo "🔨 Building Docker image for ${SERVICE_NAME}..."
+                script {
+                    sh '''
+                        cd ${SERVICE_DIR}
+                        echo "Building ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                        echo "✓ Docker image built successfully"
+                    '''
+                }
+            }
+        }
+        
+        stage('Push') {
+            steps {
+                echo "📤 Pushing Docker image to registry..."
+                script {
+                    sh '''
+                        echo "Pushing ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+                        echo "✓ Docker image pushed successfully"
+                    '''
+                }
+            }
+        }
+        
         stage('Pre-Deployment Check') {
             steps {
                 echo "🔍 Pre-deployment checks..."
