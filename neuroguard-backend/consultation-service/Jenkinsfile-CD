@@ -2,6 +2,7 @@ pipeline {
     agent any
     parameters {
         string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build number from CI pipeline')
+        string(name: 'COMMIT_SHA', defaultValue: '', description: 'Exact commit SHA produced by CI')
     }
     environment {
         DOCKER_IMAGE = "neuroguard/consultation-service"
@@ -13,11 +14,17 @@ pipeline {
     options {
         timeout(time: 20, unit: 'MINUTES')
         disableConcurrentBuilds()
+        skipDefaultCheckout(true)
     }
     stages {
         stage('Code Checkout') {
             steps {
                 git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                script {
+                    if (params.COMMIT_SHA?.trim()) {
+                        sh "git checkout ${params.COMMIT_SHA}"
+                    }
+                }
             }
         }
         stage('Build Docker Image') {
