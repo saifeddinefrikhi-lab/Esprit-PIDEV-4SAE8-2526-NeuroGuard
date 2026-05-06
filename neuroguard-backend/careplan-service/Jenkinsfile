@@ -11,6 +11,7 @@ pipeline {
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
         SERVICE_DIR  = "neuroguard-backend/careplan-service"
         MAVEN_OPTS   = "-Xmx1024m"
+        DOCKER_REGISTRY_USER = credentials('dockerhub-user')
     }
     options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
@@ -58,7 +59,7 @@ pipeline {
         stage('Push to DockerHub') {
     steps {
         echo '🚀 Pushing image to DockerHub...'
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
+        withCredentials([usernamePassword(credentialsId: 'docker-hub', 
                                           usernameVariable: 'DOCKER_USER', 
                                           passwordVariable: 'DOCKER_PASS')]) {
             dir("${SERVICE_DIR}") {
@@ -102,5 +103,16 @@ pipeline {
     }
 }
     }
-    post { always { cleanWs() } }
+    post { 
+        success {
+            // Déclencher la pipeline CD après succès de la CI
+            build job: 'careplan-service-CD', 
+                  parameters: [
+                      string(name: 'BUILD_NUMBER', value: "${env.BUILD_NUMBER}"),
+                      string(name: 'DOCKER_TAG', value: "${env.BUILD_NUMBER}")
+                  ],
+                  wait: false
+        }
+        always { cleanWs() } 
+    }
 }

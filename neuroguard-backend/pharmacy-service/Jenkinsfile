@@ -11,6 +11,7 @@ pipeline {
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
         SERVICE_DIR  = "neuroguard-backend/pharmacy-service"
         MAVEN_OPTS   = "-Xmx1024m"
+        DOCKER_REGISTRY_USER = credentials('dockerhub-user')
     }
     options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
@@ -100,7 +101,17 @@ pipeline {
             }
         }
     }
-}
+    post { 
+        success {
+            // Déclencher la pipeline CD après succès de la CI
+            build job: 'pharmacy-service-CD', 
+                  parameters: [
+                      string(name: 'BUILD_NUMBER', value: "${env.BUILD_NUMBER}"),
+                      string(name: 'DOCKER_TAG', value: "${env.BUILD_NUMBER}")
+                  ],
+                  wait: false
+        }
+        always { cleanWs() } 
     }
-    post { always { cleanWs() } }
+}
 }

@@ -1,0 +1,202 @@
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'DOCKER_TAG', defaultValue: 'latest', description: 'Docker image tag to deploy')
+        string(name: 'BUILD_NUMBER', defaultValue: '1', description: 'CI Build number')
+    }
+    
+    environment {
+        DOCKER_IMAGE = "neuroguard/pharmacy-service"
+        SERVICE_NAME = "pharmacy-service"
+        SERVICE_DIR = "neuroguard-backend/pharmacy-service"
+        K8S_MANIFEST_DIR = "neuroguard-backend/k8s/pharmacy-service"
+        KUBE_NAMESPACE = "neuroguard"
+        KUBE_CONFIG = credentials('kubeconfig-file')
+        DOCKER_REGISTRY_USER = credentials('dockerhub-user')
+    }
+    
+    options { 
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Pre-Deployment Check') {
+            steps {
+                echo "🔍 Pre-deployment checks..."
+                script {
+                    withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                        sh '''
+                            echo "Checking kubectl connectivity..."
+                            kubectl cluster-info
+                            
+                            echo ""
+                            echo "Kubernetes version:"
+                            kubectl version --short
+                            
+                            echo ""
+                            echo "Checking namespace..."
+                            kubectl get namespace ${KUBE_NAMESPACE} || echo "Namespace will be created"
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "🚀 Deploying ${SERVICE_NAME}:${DOCKER_TAG} to Kubernetes..."
+                script {
+                    withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                        sh '''
+                            # Create namespace if it doesn't exist
+                            kubectl create namespace ${KUBE_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                            echo "✓ Namespace '${KUBE_NAMESPACE}' ready"
+                            
+                            # Apply ConfigMap
+                            kubectl apply -f ${K8S_MANIFEST_DIR}/configmap.yaml
+                            echo "✓ ConfigMap applied"
+                            
+                            # Check if deployment exists
+                            if kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} &>/dev/null; then
+                                echo "Updating existing deployment..."
+                                kubectl set image deployment/${SERVICE_NAME} \
+                                    ${SERVICE_NAME}=${DOCKER_REGISTRY_USER}/${SERVICE_NAME}:${DOCKER_TAG} \
+                                    -n ${KUBE_NAMESPACE}
+                            else
+                                echo "Creating new deployment..."
+                                kubectl apply -f ${K8S_MANIFEST_DIR}/deployment.yaml
+                            fi
+                            
+                            echo "✓ Deployment configured"
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Wait for Rollout') {
+            steps {
+                echo "⏳ Waiting for rollout to complete..."
+                script {
+                    withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                        sh '''
+                            echo "Waiting for deployment to be ready (max 5 minutes)..."
+                            kubectl rollout status deployment/${SERVICE_NAME} \
+                                -n ${KUBE_NAMESPACE} \
+                                --timeout=5m
+                            
+                            echo "✓ Rollout completed successfully"
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                echo "✓ Verifying deployment..."
+                script {
+                    withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                        sh '''
+                            echo "======================================"
+                            echo "Pods Status:"
+                            echo "======================================"
+                            kubectl get pods -n ${KUBE_NAMESPACE} -l app=${SERVICE_NAME} -o wide
+                            
+                            echo ""
+                            echo "======================================"
+                            echo "Service Status:"
+                            echo "======================================"
+                            kubectl get svc ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o wide
+                            
+                            echo ""
+                            echo "======================================"
+                            echo "Deployment Details:"
+                            echo "======================================"
+                            kubectl describe deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} | tail -30
+                            
+                            echo ""
+                            echo "======================================"
+                            echo "Recent Events:"
+                            echo "======================================"
+                            kubectl get events -n ${KUBE_NAMESPACE} --sort-by='.lastTimestamp' | tail -10
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                echo "🏥 Running health checks..."
+                script {
+                    withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                        sh '''
+                            echo "Checking pod status..."
+                            READY_PODS=$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.status.readyReplicas}')
+                            DESIRED_PODS=$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.spec.replicas}')
+                            
+                            echo "Ready pods: ${READY_PODS}/${DESIRED_PODS}"
+                            
+                            if [ "${READY_PODS}" = "${DESIRED_PODS}" ]; then
+                                echo "✓ All pods are ready"
+                            else
+                                echo "⚠ Not all pods are ready yet"
+                                exit 1
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "✅ Deployment successful!"
+            script {
+                withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                    sh '''
+                        echo ""
+                        echo "======================================"
+                        echo "Deployment Summary:"
+                        echo "======================================"
+                        echo "Service: ${SERVICE_NAME}"
+                        echo "Image: ${DOCKER_REGISTRY_USER}/${SERVICE_NAME}:${DOCKER_TAG}"
+                        echo "Namespace: ${KUBE_NAMESPACE}"
+                        echo "Replicas: $(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.status.readyReplicas}')/$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.spec.replicas}')"
+                        echo "======================================"
+                    '''
+                }
+            }
+        }
+        failure {
+            echo "❌ Deployment failed!"
+            script {
+                withEnv(["KUBECONFIG=${KUBE_CONFIG}"]) {
+                    sh '''
+                        echo "Collecting debug information..."
+                        echo ""
+                        echo "Pod logs:"
+                        kubectl logs -n ${KUBE_NAMESPACE} -l app=${SERVICE_NAME} --tail=50 || echo "No logs available"
+                        
+                        echo ""
+                        echo "Pod descriptions:"
+                        kubectl describe pods -n ${KUBE_NAMESPACE} -l app=${SERVICE_NAME}
+                    '''
+                }
+            }
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
