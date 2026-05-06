@@ -4,9 +4,9 @@ pipeline {
         githubPush()
     }
     environment {
-        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        // Use local Git mirror on Jenkins server (no internet required)
+        GIT_REPO     = 'file:///var/lib/jenkins/git-mirrors/neuroguard.git'
         GIT_BRANCH   = 'main'
-        GITHUB_TOKEN = credentials('github-token')
         SONAR_TOKEN  = credentials('sonar-token')
         DOCKER_IMAGE = "neuroguard/careplan-service"
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
@@ -17,14 +17,8 @@ pipeline {
     stages {
         stage('Code Checkout') {
             steps {
-                script {
-                    // Use GitHub token for HTTPS authentication
-                    git(
-                        branch: "${GIT_BRANCH}",
-                        url: "https://${GITHUB_TOKEN}@github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git",
-                        credentialsId: 'github-token'
-                    )
-                }
+                git branch: "${GIT_BRANCH}",
+                    url: "${GIT_REPO}"
             }
         }
         stage('JUnit Tests') {
