@@ -9,4 +9,4 @@ COPY target/*.jar app.jar
 
 USER appuser
 EXPOSE 8083
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]  
