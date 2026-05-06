@@ -64,16 +64,33 @@ pipeline {
             steps {
                 echo '✅ CI passed – triggering CD pipeline...'
                 script {
-                    // Déclenche le pipeline CD après succès du CI
-                    def cdJobName = env.JOB_NAME.replaceFirst(/Jenkinsfile$/, 'Jenkinsfile-CD')
-                    echo "Triggering job: ${cdJobName}"
-                    build job: cdJobName,
-                          parameters: [
-                              string(name: 'BUILD_NUMBER', value: "${BUILD_NUMBER}"),
-                              string(name: 'DOCKER_TAG', value: "build-${BUILD_NUMBER}")
-                          ],
-                          wait: false,
-                          propagate: false
+                    try {
+                        // Essayer différents patterns de noms de jobs
+                        def cdJobName = null
+                        
+                        // Pattern 1: Si le job contient le chemin (ex: neuroguard-backend/careplan-service/hamza)
+                        if (env.JOB_NAME.contains('/')) {
+                            cdJobName = env.JOB_NAME.replaceFirst(/\/[^/]*$/, '/careplan-service-cd')
+                        } else {
+                            // Pattern 2: Sinon, chercher un job avec suffixe -cd
+                            cdJobName = env.JOB_NAME.replaceAll(/(-ci)?$/, '-cd')
+                        }
+                        
+                        echo "Current Job: ${env.JOB_NAME}"
+                        echo "Target CD Job: ${cdJobName}"
+                        
+                        build job: cdJobName,
+                              parameters: [
+                                  string(name: 'BUILD_NUMBER', value: "${BUILD_NUMBER}"),
+                                  string(name: 'DOCKER_TAG', value: "build-${BUILD_NUMBER}")
+                              ],
+                              wait: false,
+                              propagate: false
+                    } catch (Exception e) {
+                        echo "⚠️ Erreur lors du déclenchement du CD: ${e.message}"
+                        echo "Vérifie que le job CD existe avec le bon nom"
+                        // Ne pas échouer le CI si le CD ne peut pas être déclenché
+                    }
                 }
             }
         }
