@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forum-service
+  labels:
+    app: forum-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forum-service
+  template:
+    metadata:
+      labels:
+        app: forum-service
+    spec:
+      containers:
+        - name: forum-service
+          image: 10830313/forum-service:latest
+          ports:
+            - containerPort: 8085
+          env:
+            - name: DB_USERNAME
+              value: root
+            - name: DB_PASSWORD
+              value: root
+            - name: EUREKA_REGISTER
+              value: "false"
+            - name: EUREKA_FETCH
+              value: "false"

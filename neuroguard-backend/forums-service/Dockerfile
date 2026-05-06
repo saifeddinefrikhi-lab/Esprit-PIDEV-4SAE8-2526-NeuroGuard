@@ -1,12 +1,18 @@
-FROM eclipse-temurin:17-jre-alpine
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+
 WORKDIR /app
 
-# Create a non‑root user (fix the adduser/addgroup syntax for Alpine)
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+COPY pom.xml .
+COPY src ./src
 
-# Copy the JAR that was built by the pipeline (not rebuilt inside Docker)
-COPY target/*.jar app.jar
+RUN mvn clean package -DskipTests
 
-USER appuser
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8083
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["java","-jar","app.jar"]

@@ -6,11 +6,11 @@ pipeline {
     }
 
     environment {
-        SERVICE_DIR = 'neuroguard-backend/user-service'
+        SERVICE_DIR = 'neuroguard-backend/forums-service'
 
         SONAR_TOKEN = credentials('sonar-token')
 
-        DOCKER_IMAGE = 'neuroguard/user-service'
+        DOCKER_IMAGE = 'neuroguard/forum-service'
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
 
         MAVEN_OPTS = '-Xmx1024m'
@@ -55,8 +55,8 @@ pipeline {
                     withSonarQubeEnv('SonarQube') {
                         sh '''
                             mvn sonar:sonar -B \
-                            -Dsonar.projectKey=neuroguard-user-service \
-                            -Dsonar.projectName="NeuroGuard - User Service" \
+                            -Dsonar.projectKey=neuroguard-forum-service \
+                            -Dsonar.projectName="NeuroGuard - Forum Service" \
                             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                         '''
                     }
@@ -107,15 +107,15 @@ pipeline {
                     dir("${SERVICE_DIR}") {
                         unstash 'docker-image'
                         sh 'docker load -i docker-image.tar'
-                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/user-service:${DOCKER_TAG}"
+                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/forum-service:${DOCKER_TAG}"
                         sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
 
                         retry(3) {
-                            sh "docker push ${DOCKER_USER}/user-service:${DOCKER_TAG}"
+                            sh "docker push ${DOCKER_USER}/forum-service:${DOCKER_TAG}"
                         }
 
                         sh 'docker logout'
-                        sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/user-service:${DOCKER_TAG} || true"
+                        sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/forum-service:${DOCKER_TAG} || true"
                     }
                 }
             }
@@ -136,9 +136,9 @@ pipeline {
                         sh 'kubectl apply -f k8s/service.yaml'
                         sh 'kubectl apply -f k8s/servicemonitor.yaml'
 
-                        sh "kubectl set image deployment/user-service user-service=${DOCKER_USER}/user-service:${DOCKER_TAG}"
+                        sh "kubectl set image deployment/forum-service forum-service=${DOCKER_USER}/forum-service:${DOCKER_TAG}"
 
-                        sh 'kubectl rollout status deployment/user-service --timeout=180s'
+                        sh 'kubectl rollout status deployment/forum-service --timeout=180s'
                         sh 'kubectl get pods'
                         sh 'kubectl get svc'
                     }
