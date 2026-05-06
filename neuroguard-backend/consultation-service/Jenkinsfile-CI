@@ -37,7 +37,7 @@ pipeline {
         stage('Build') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean package -DskipTests -B"
+                    sh "mvn package -DskipTests -B"
                 }
             }
         }
@@ -63,9 +63,12 @@ pipeline {
         stage('Trigger CD Pipeline') {
             steps {
                 echo '✅ CI passed – triggering CD pipeline...'
-                build job: 'consultation-service-CD',
-                      parameters: [string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}")],
-                      wait: false
+                script {
+                    def cdJobName = env.JOB_NAME.replaceFirst(/^CI_/, 'CD_')
+                    build job: cdJobName,
+                          parameters: [string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}")],
+                          wait: false
+                }
             }
         }
     }

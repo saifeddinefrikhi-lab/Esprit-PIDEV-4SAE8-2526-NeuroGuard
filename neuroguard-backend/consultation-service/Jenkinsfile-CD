@@ -72,17 +72,17 @@ pipeline {
                     kubectl apply -f secret.yaml    --namespace=neuroguard
 
                     # Update image tag in deployment.yaml
-                    sed -i "s|image: .*reservation-service.*|image: ${DOCKERHUB_USER}/reservation-service:${DOCKER_TAG}|" deployment.yaml
+                    sed -i "s|image: .*consultation-service.*|image: ${DOCKERHUB_USER}/consultation-service:${DOCKER_TAG}|" deployment.yaml
 
                     # Apply all manifests
                     kubectl apply -f deployment.yaml --namespace=neuroguard
                     kubectl apply -f service.yaml    --namespace=neuroguard
 
                     # Wait for rollout
-                    kubectl rollout status deployment/reservation-service --namespace=neuroguard --timeout=120s
+                    kubectl rollout status deployment/consultation-service --namespace=neuroguard --timeout=120s
 
                     # Show running pods
-                    kubectl get pods -l app=reservation-service --namespace=neuroguard
+                    kubectl get pods -l app=consultation-service --namespace=neuroguard
 
                     # Cleanup temp kubeconfig
                     rm -f /tmp/kubeconfig
