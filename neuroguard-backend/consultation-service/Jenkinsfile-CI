@@ -25,7 +25,7 @@ pipeline {
             steps {
                 echo '🧪 Starting fast Mockito unit tests...'
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -Dtest=ConsultationServiceTests,AvailabilityServiceTests -DforkCount=1"
+                    sh "mvn test -B -Dtest=ConsultationServiceTests,AvailabilityServiceTests -DforkCount=1"
                 }
                 echo '✅ Mockito unit tests passed'
             }
