@@ -4,9 +4,8 @@ pipeline {
         githubPush()
     }
     environment {
-        // Use SMB shared bare repository - Replace YOUR-LOCAL-IP with your machine's actual IP
-        // Example: GIT_REPO = '\\\\192.168.1.50\\neuroguard-mirror'
-        GIT_REPO     = 'file://///YOUR-LOCAL-IP/neuroguard-mirror'
+        // Use SMB shared bare repository
+        GIT_REPO     = 'file://///192.168.12.11/neuroguard-mirror'
         GIT_BRANCH   = 'main'
         SONAR_TOKEN  = credentials('sonar-token')
         DOCKER_IMAGE = "neuroguard/careplan-service"
