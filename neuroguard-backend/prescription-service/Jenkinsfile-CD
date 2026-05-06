@@ -13,7 +13,7 @@ pipeline {
         K8S_MANIFEST_DIR = "neuroguard-backend/k8s/prescription-service"
         KUBE_NAMESPACE = "neuroguard"
         KUBE_CONFIG = credentials('kubeconfig-file')
-        DOCKER_REGISTRY_USER = credentials('dockerhub-user')
+        DOCKER_REGISTRY = "neuroguard"
     }
     
     options { 
@@ -68,7 +68,7 @@ pipeline {
                             if kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} &>/dev/null; then
                                 echo "Updating existing deployment..."
                                 kubectl set image deployment/${SERVICE_NAME} \
-                                    ${SERVICE_NAME}=${DOCKER_REGISTRY_USER}/${SERVICE_NAME}:${DOCKER_TAG} \
+                                    ${SERVICE_NAME}=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_TAG} \
                                     -n ${KUBE_NAMESPACE}
                             else
                                 echo "Creating new deployment..."
@@ -170,7 +170,7 @@ pipeline {
                         echo "Deployment Summary:"
                         echo "======================================"
                         echo "Service: ${SERVICE_NAME}"
-                        echo "Image: ${DOCKER_REGISTRY_USER}/${SERVICE_NAME}:${DOCKER_TAG}"
+                        echo "Image: ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_TAG}"
                         echo "Namespace: ${KUBE_NAMESPACE}"
                         echo "Replicas: $(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.status.readyReplicas}')/$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.spec.replicas}')"
                         echo "======================================"

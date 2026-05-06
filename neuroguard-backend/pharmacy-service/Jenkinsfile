@@ -11,7 +11,6 @@ pipeline {
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
         SERVICE_DIR  = "neuroguard-backend/pharmacy-service"
         MAVEN_OPTS   = "-Xmx1024m"
-        DOCKER_REGISTRY_USER = credentials('dockerhub-user')
     }
     options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
     stages {
