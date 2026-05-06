@@ -6,6 +6,7 @@ pipeline {
     environment {
         GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
         GIT_BRANCH   = 'main'
+        GITHUB_TOKEN = credentials('github-token')
         SONAR_TOKEN  = credentials('sonar-token')
         DOCKER_IMAGE = "neuroguard/careplan-service"
         DOCKER_TAG   = "${env.BUILD_NUMBER}"
@@ -16,8 +17,14 @@ pipeline {
     stages {
         stage('Code Checkout') {
             steps {
-                git branch: "${GIT_BRANCH}",
-                    url: "${GIT_REPO}"
+                script {
+                    // Use GitHub token for HTTPS authentication
+                    git(
+                        branch: "${GIT_BRANCH}",
+                        url: "https://${GITHUB_TOKEN}@github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git",
+                        credentialsId: 'github-token'
+                    )
+                }
             }
         }
         stage('JUnit Tests') {
