@@ -4,8 +4,8 @@ pipeline {
         githubPush()
     }
     environment {
-        // Use local Git mirror on Jenkins server (no internet required)
-        GIT_REPO     = 'file:///var/lib/jenkins/git-mirrors/neuroguard.git'
+        // Use local bare repository (can be accessed via file:// or network path)
+        GIT_REPO     = 'file:///c:/Users/CBE/Desktop/neuroguard.git'
         GIT_BRANCH   = 'main'
         SONAR_TOKEN  = credentials('sonar-token')
         DOCKER_IMAGE = "neuroguard/careplan-service"
