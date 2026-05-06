@@ -34,12 +34,16 @@ pipeline {
 
         stage('Code Checkout') {
             steps {
-
-                echo 'Source code already checked out by Jenkins SCM'
-
-                sh 'git branch -a'
-
-                sh 'git log -1 --oneline'
+                script {
+                    // Get branch name from various Jenkins environment variables
+                    def branchName = env.BRANCH_NAME ?: env.CHANGE_BRANCH ?: env.GIT_BRANCH ?: 'jihenedevops'
+                    echo "Using branch: ${branchName}"
+                    
+                    // Checkout the specific branch
+                    git branch: branchName,
+                        url: "${GIT_REPO}",
+                        credentialsId: 'jiheneGithub'
+                }
             }
         }
 
