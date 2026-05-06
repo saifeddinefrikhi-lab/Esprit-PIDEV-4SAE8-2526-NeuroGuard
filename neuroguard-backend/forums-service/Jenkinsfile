@@ -20,10 +20,6 @@ pipeline {
         KUBECONFIG = '/home/damiano/.kube/config'
     }
 
-    options {
-        timeout(time: 30, unit: 'MINUTES')
-        disableConcurrentBuilds()
-    }
 
     stages {
         stage('Check Tools') {
