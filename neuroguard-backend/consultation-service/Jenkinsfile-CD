@@ -9,7 +9,7 @@ pipeline {
         DOCKER_TAG   = "${params.BUILD_NUMBER_CI}"
         SERVICE_DIR  = "neuroguard-backend/consultation-service"
         GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'main'
+        GIT_BRANCH   = 'ameni'
     }
     options {
         timeout(time: 20, unit: 'MINUTES')
