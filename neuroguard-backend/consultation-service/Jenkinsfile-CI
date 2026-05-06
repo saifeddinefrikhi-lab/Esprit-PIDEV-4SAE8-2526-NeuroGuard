@@ -23,9 +23,11 @@ pipeline {
         }
         stage('Unit Tests') {
             steps {
+                echo '🧪 Starting fast Mockito unit tests...'
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q -Dtest=ConsultationServiceTests,AvailabilityServiceTests"
+                    sh "mvn clean test -B -Dtest=ConsultationServiceTests,AvailabilityServiceTests -DforkCount=1"
                 }
+                echo '✅ Mockito unit tests passed'
             }
             post {
                 always {
@@ -36,8 +38,12 @@ pipeline {
         }
         stage('Spring Context Smoke Test') {
             steps {
-                dir("${SERVICE_DIR}") {
-                    sh "mvn test -B -q -Dtest=ConsultationServiceApplicationTests"
+                timeout(time: 120, unit: 'SECONDS') {
+                    echo '🚀 Starting Spring Boot context smoke test (this is slower)...'
+                    dir("${SERVICE_DIR}") {
+                        sh "mvn test -B -Dtest=ConsultationServiceApplicationTests -DforkCount=1"
+                    }
+                    echo '✅ Spring context smoke test passed'
                 }
             }
             post {
