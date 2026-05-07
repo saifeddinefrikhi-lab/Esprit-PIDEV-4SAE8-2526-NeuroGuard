@@ -91,14 +91,16 @@ pipeline {
         }
     }
 
-    post {
-        always  { cleanWs() }
-        success {
-            echo "✅ Eureka Server CI passed — triggering CD..."
-            build job: 'CD_EurekaServer',
-                  parameters: [string(name: 'BUILD_NUMBER_CI', value: "${DOCKER_TAG}")],
-                  wait: false
-        }
-        failure { echo '❌ Eureka Server CI failed.' }
+   post {
+    success {
+        echo "✅ Eureka Server CI passed — triggering CD..."
+        build job: 'CD_EurekaServer',
+              parameters: [
+                  string(name: 'BUILD_NUMBER_CI', value: "${DOCKER_TAG}"),
+                  string(name: 'DOCKERHUB_USER',  value: "${env.DOCKERHUB_USER}")
+              ],
+              wait: false
     }
+    failure { echo '❌ Eureka Server CI failed.' }
+}
 }

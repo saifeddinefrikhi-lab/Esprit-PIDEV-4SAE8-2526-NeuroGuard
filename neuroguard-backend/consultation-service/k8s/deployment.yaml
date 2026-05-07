@@ -36,7 +36,7 @@ spec:
             - until nc -z eureka-server 8761; do echo 'waiting for eureka-server:8761'; sleep 5; done
       containers:
         - name: consultation-service
-          image: YOUR_DOCKERHUB_USER/consultation-service:latest
+          image: ameniferjeni/consultation-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8090

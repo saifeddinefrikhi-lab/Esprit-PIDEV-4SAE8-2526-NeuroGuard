@@ -2,13 +2,13 @@ pipeline {
     agent any
     parameters {
         string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build tag from CI pipeline')
+        string(name: 'DOCKERHUB_USER',  defaultValue: 'ameniferjeni', description: 'DockerHub username')
     }
     environment {
-        DOCKER_IMAGE = "neuroguard/eureka-server"
-        DOCKER_TAG   = "${params.BUILD_NUMBER_CI}"
-        SERVICE_DIR  = "neuroguard-backend/eureka-server"
-        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'ameni'
+        DOCKER_TAG  = "${params.BUILD_NUMBER_CI}"
+        SERVICE_DIR = "neuroguard-backend/eureka-server"
+        GIT_REPO    = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH  = 'ameni'
     }
     options {
         timeout(time: 30, unit: 'MINUTES')
@@ -43,8 +43,10 @@ pipeline {
                             kubectl --insecure-skip-tls-verify apply -f configmap.yaml --namespace=neuroguard
                             kubectl --insecure-skip-tls-verify apply -f secret.yaml    --namespace=neuroguard
 
-                            # Update image in deployment.yaml
-                            sed -i "s|image: .*eureka-server.*|image: \${DOCKERHUB_USER}/eureka-server:${DOCKER_TAG}|" deployment.yaml
+                            # Update image — use params.DOCKERHUB_USER explicitly
+                            sed -i "s|image: .*eureka-server.*|image: ${params.DOCKERHUB_USER}/eureka-server:${DOCKER_TAG}|" deployment.yaml
+
+                            echo "🐳 Deploying image: ${params.DOCKERHUB_USER}/eureka-server:${DOCKER_TAG}"
 
                             # Delete existing deployment to force fresh rollout
                             kubectl --insecure-skip-tls-verify delete deployment eureka-server \
