@@ -2,24 +2,33 @@ pipeline {
     agent any
     parameters {
         string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build number from CI pipeline')
+        string(name: 'COMMIT_SHA',      defaultValue: '',       description: 'Exact commit SHA produced by CI')
     }
     environment {
         DOCKER_IMAGE = "neuroguard/assurance-service"
         DOCKER_TAG   = "${params.BUILD_NUMBER_CI}"
         SERVICE_DIR  = "neuroguard-backend/assurance-service"
         GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'main'
+        GIT_BRANCH   = 'ameni'
     }
     options {
-        timeout(time: 20, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
+        skipDefaultCheckout(true)
     }
     stages {
+
         stage('Code Checkout') {
             steps {
                 git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                script {
+                    if (params.COMMIT_SHA?.trim()) {
+                        sh "git checkout ${params.COMMIT_SHA}"
+                    }
+                }
             }
         }
+
         stage('Build Docker Image') {
             steps {
                 dir("${SERVICE_DIR}") {
@@ -30,60 +39,154 @@ pipeline {
                 }
             }
         }
+
         stage('Push to DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub',
-                                                  usernameVariable: 'DOCKER_USER',
-                                                  passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
                     dir("${SERVICE_DIR}") {
                         unstash 'docker-image'
                         sh 'docker load -i docker-image.tar'
-                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/assurance-service:${DOCKER_TAG}"
+                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} \${DOCKER_USER}/assurance-service:${DOCKER_TAG}"
                         sh 'echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin'
                         retry(3) {
-                            sh "docker push ${DOCKER_USER}/assurance-service:${DOCKER_TAG}"
+                            sh "docker push \${DOCKER_USER}/assurance-service:${DOCKER_TAG}"
                         }
                         sh 'docker logout'
-                        sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/assurance-service:${DOCKER_TAG} || true"
+                        sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} \${DOCKER_USER}/assurance-service:${DOCKER_TAG} || true"
                         script { env.DOCKERHUB_USER = DOCKER_USER }
                     }
                 }
             }
         }
+
         stage('Deploy to Kubernetes') {
     steps {
         echo '☸️ Deploying to Kubernetes (kubeadm)...'
         withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
             dir("${SERVICE_DIR}/k8s") {
                 sh """
-                    # Decode kubeconfig to a temp file
                     echo "\$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
                     export KUBECONFIG=/tmp/kubeconfig
 
-                    # Verify cluster is reachable
-                    kubectl get nodes
+                    kubectl --insecure-skip-tls-verify get nodes
 
-                    # Create namespace if it doesn't exist
-                    kubectl get namespace neuroguard 2>/dev/null || kubectl create namespace neuroguard
+                    # Create namespace if not exists
+                    kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || \
+                    kubectl --insecure-skip-tls-verify create namespace neuroguard
 
-                    # Apply configmap and secret
-                    kubectl apply -f configmap.yaml --namespace=neuroguard
-                    kubectl apply -f secret.yaml    --namespace=neuroguard
+                    # ── 0. Storage ────────────────────────────────────
+                    echo "💾 Creating Persistent Volume..."
+                    kubectl --insecure-skip-tls-verify apply -f mysql-pv.yaml
+                    kubectl --insecure-skip-tls-verify apply -f mysql-pvc.yaml --namespace=neuroguard
 
-                    # Update image tag in deployment.yaml
-                    sed -i "s|image: .*reservation-service.*|image: ${DOCKERHUB_USER}/reservation-service:${DOCKER_TAG}|" deployment.yaml
+                    # Check PVC status directly instead of using wait
+                    sleep 5
+                    PVC_STATUS=\$(kubectl --insecure-skip-tls-verify get pvc mysql-pvc \
+                        --namespace=neuroguard \
+                        -o jsonpath='{.status.phase}')
+                    echo "PVC Status: \$PVC_STATUS"
 
-                    # Apply all manifests
-                    kubectl apply -f deployment.yaml --namespace=neuroguard
-                    kubectl apply -f service.yaml    --namespace=neuroguard
+                    if [ "\$PVC_STATUS" != "Bound" ]; then
+                        echo "❌ PVC not bound. Status: \$PVC_STATUS"
+                        kubectl --insecure-skip-tls-verify describe pvc mysql-pvc -n neuroguard
+                        rm -f /tmp/kubeconfig
+                        exit 1
+                    fi
+                    echo "✅ PVC bound successfully"
 
-                    # Wait for rollout
-                    kubectl rollout status deployment/reservation-service --namespace=neuroguard --timeout=120s
+                    # ── 1. Deploy MySQL ──────────────────────────────────
+                    echo "🗄️ Deploying MySQL..."
+                    # Delete existing deployment to force fresh rollout
+                    kubectl --insecure-skip-tls-verify delete deployment mysql \
+                        --namespace=neuroguard --ignore-not-found=true
+                    sleep 5
+                    kubectl --insecure-skip-tls-verify apply -f mysql-deployment.yaml --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify rollout status deployment/mysql \
+                        --namespace=neuroguard --timeout=600s || {
+                        echo "❌ MySQL failed. Debugging..."
+                        kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                        kubectl --insecure-skip-tls-verify describe pod -l app=mysql -n neuroguard
+                        kubectl --insecure-skip-tls-verify logs -l app=mysql -n neuroguard --tail=30 || true
+                        rm -f /tmp/kubeconfig
+                        exit 1
+                    }
+                    echo "✅ MySQL is running"
 
-                    # Show running pods
-                    kubectl get pods -l app=reservation-service --namespace=neuroguard
+                    # ── 2. Deploy Redis ──────────────────────────────────
+                    echo "🔴 Deploying Redis..."
+                    kubectl --insecure-skip-tls-verify apply -f redis-deployment.yaml --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify rollout status deployment/redis \
+                        --namespace=neuroguard --timeout=180s || {
+                        echo "❌ Redis failed. Debugging..."
+                        kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                        kubectl --insecure-skip-tls-verify describe pod -l app=redis -n neuroguard
+                        kubectl --insecure-skip-tls-verify logs -l app=redis -n neuroguard --tail=30 || true
+                        rm -f /tmp/kubeconfig
+                        exit 1
+                    }
+                    echo "✅ Redis is running"
 
-                    # Cleanup temp kubeconfig
+                    # ── 3. Wait for Eureka (deployed by Eureka CD) ───
+                            echo "🔍 Waiting for Eureka Server..."
+                            EUREKA_READY=false
+                            for i in \$(seq 1 30); do
+                                STATUS=\$(kubectl --insecure-skip-tls-verify get deployment eureka-server \
+                                    --namespace=neuroguard \
+                                    -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+                                echo "  Attempt \$i/30 — Eureka ready replicas: \${STATUS:-0}"
+                                if [ "\${STATUS}" = "1" ]; then
+                                    EUREKA_READY=true
+                                    break
+                                fi
+                                sleep 10
+                            done
+
+                            if [ "\$EUREKA_READY" = "false" ]; then
+                                echo "❌ Eureka not ready after 300s. Debugging..."
+                                kubectl --insecure-skip-tls-verify get pods -n neuroguard -l app=eureka-server
+                                kubectl --insecure-skip-tls-verify describe pod -l app=eureka-server -n neuroguard
+                                kubectl --insecure-skip-tls-verify logs -l app=eureka-server -n neuroguard --tail=30 || true
+                                rm -f /tmp/kubeconfig
+                                exit 1
+                            fi
+                            echo "✅ Eureka is ready"
+
+                    # ── 4. Deploy Assurance Service ───────────────────
+                    echo "🛡️ Deploying Assurance Service..."
+                    kubectl --insecure-skip-tls-verify apply -f configmap.yaml --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify apply -f secret.yaml    --namespace=neuroguard
+
+                    sed -i "s|image: .*assurance-service.*|image: ${env.DOCKERHUB_USER}/assurance-service:${DOCKER_TAG}|" deployment.yaml
+
+                    kubectl --insecure-skip-tls-verify apply -f deployment.yaml --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify apply -f service.yaml    --namespace=neuroguard
+
+                    kubectl --insecure-skip-tls-verify rollout status deployment/assurance-service \
+                        --namespace=neuroguard --timeout=900s || {
+                        echo "❌ Assurance Service rollout failed. Debugging..."
+                        kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                        kubectl --insecure-skip-tls-verify describe pod -l app=assurance-service -n neuroguard
+                        kubectl --insecure-skip-tls-verify logs -l app=assurance-service -n neuroguard --tail=50 || true
+                        rm -f /tmp/kubeconfig
+                        exit 1
+                    }
+
+                    # ── Final Status ─────────────────────────────────────
+                    echo ""
+                    echo "✅ All services deployed successfully!"
+                    echo ""
+                    kubectl --insecure-skip-tls-verify get pods --namespace=neuroguard
+                    echo ""
+                    kubectl --insecure-skip-tls-verify get services --namespace=neuroguard
+                    echo ""
+                    kubectl --insecure-skip-tls-verify get pvc --namespace=neuroguard
+                    echo ""
+                    echo "🌐 Assurance Service: http://192.168.33.10:30093"
+
                     rm -f /tmp/kubeconfig
                 """
             }
@@ -91,9 +194,10 @@ pipeline {
     }
 }
     }
+
     post {
-        always { cleanWs() }
-        success { echo '✅ assurance-service deployed to kubeadm cluster.' }
-        failure  { echo '❌ CD pipeline failed.' }
+        always  { cleanWs() }
+        success { echo '✅ assurance-service deployed successfully.' }
+        failure { echo '❌ CD pipeline failed.' }
     }
 }

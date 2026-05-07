@@ -4,14 +4,14 @@ metadata:
   name: assurance-service-config
   namespace: neuroguard
 data:
-  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/neuroguard_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC"
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/assurance_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
   SPRING_DATASOURCE_USERNAME: "root"
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.MySQLDialect"
   SPRING_JPA_SHOW_SQL: "false"
+  SPRING_REDIS_HOST: "redis-service"
+  SPRING_REDIS_PORT: "6379"
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka"
-  SERVER_PORT: "8091"
-  ML_PREDICTOR_SERVICE_URL: "http://ml-predictor-service:5000"
-  SPRING_MAIL_HOST: "smtp.gmail.com"
-  SPRING_MAIL_PORT: "587"
-  SPRING_THYMELEAF_ENABLED: "true"
-  SPRING_THYMELEAF_CACHE: "true"
+  SERVER_PORT: "8093"
+  USER_SERVICE_URL: "http://user-service:8081"
+  CONSULTATION_SERVICE_URL: "http://consultation-service:8090"

@@ -15,31 +15,57 @@ spec:
       labels:
         app: assurance-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z mysql-service 3306; do echo 'waiting for mysql-service:3306'; sleep 5; done
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z redis-service 6379; do echo 'waiting for redis-service:6379'; sleep 5; done
+        - name: wait-for-eureka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z eureka-server 8761; do echo 'waiting for eureka-server:8761'; sleep 5; done
       containers:
         - name: assurance-service
-          image: YOUR_DOCKERHUB_USER/assurance-service:latest
+          image: ameniferjeni/assurance-service:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8091
+            - containerPort: 8093
           envFrom:
             - configMapRef:
                 name: assurance-service-config
             - secretRef:
                 name: assurance-service-secret
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8093
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 60      # ← 60 × 10s = 600s max startup time
           readinessProbe:
             httpGet:
               path: /actuator/health
-              port: 8091
+              port: 8093
             initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 5
+            failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /actuator/health
-              port: 8091
-            initialDelaySeconds: 60
+              port: 8093
+            initialDelaySeconds: 180
             periodSeconds: 20
-            failureThreshold: 3
+            failureThreshold: 5
           resources:
             requests:
               memory: "256Mi"
