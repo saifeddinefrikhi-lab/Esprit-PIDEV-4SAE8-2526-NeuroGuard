@@ -12,7 +12,7 @@ pipeline {
         GIT_BRANCH   = 'ameni'
     }
     options {
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
         skipDefaultCheckout(true)
     }
@@ -73,10 +73,10 @@ pipeline {
                             echo "\$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
                             export KUBECONFIG=/tmp/kubeconfig
 
-                            # Verify cluster
+                            # Verify cluster is reachable
                             kubectl --insecure-skip-tls-verify get nodes
 
-                            # Create namespace
+                            # Create namespace if not exists
                             kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || \
                             kubectl --insecure-skip-tls-verify create namespace neuroguard
 
@@ -84,19 +84,43 @@ pipeline {
                             echo "🗄️ Deploying MySQL..."
                             kubectl --insecure-skip-tls-verify apply -f mysql-deployment.yaml --namespace=neuroguard
                             kubectl --insecure-skip-tls-verify rollout status deployment/mysql \
-                                --namespace=neuroguard --timeout=120s
+                                --namespace=neuroguard --timeout=300s || {
+                                echo "❌ MySQL failed. Debugging..."
+                                kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                                kubectl --insecure-skip-tls-verify describe pod -l app=mysql -n neuroguard
+                                kubectl --insecure-skip-tls-verify logs -l app=mysql -n neuroguard --tail=30 || true
+                                rm -f /tmp/kubeconfig
+                                exit 1
+                            }
+                            echo "✅ MySQL is running"
 
                             # ── 2. Deploy Redis ──────────────────────────────
                             echo "🔴 Deploying Redis..."
                             kubectl --insecure-skip-tls-verify apply -f redis-deployment.yaml --namespace=neuroguard
                             kubectl --insecure-skip-tls-verify rollout status deployment/redis \
-                                --namespace=neuroguard --timeout=120s
+                                --namespace=neuroguard --timeout=180s || {
+                                echo "❌ Redis failed. Debugging..."
+                                kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                                kubectl --insecure-skip-tls-verify describe pod -l app=redis -n neuroguard
+                                kubectl --insecure-skip-tls-verify logs -l app=redis -n neuroguard --tail=30 || true
+                                rm -f /tmp/kubeconfig
+                                exit 1
+                            }
+                            echo "✅ Redis is running"
 
                             # ── 3. Deploy Eureka ─────────────────────────────
                             echo "🔍 Deploying Eureka..."
                             kubectl --insecure-skip-tls-verify apply -f eureka-deployment.yaml --namespace=neuroguard
                             kubectl --insecure-skip-tls-verify rollout status deployment/eureka-server \
-                                --namespace=neuroguard --timeout=180s
+                                --namespace=neuroguard --timeout=300s || {
+                                echo "❌ Eureka failed. Debugging..."
+                                kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                                kubectl --insecure-skip-tls-verify describe pod -l app=eureka-server -n neuroguard
+                                kubectl --insecure-skip-tls-verify logs -l app=eureka-server -n neuroguard --tail=30 || true
+                                rm -f /tmp/kubeconfig
+                                exit 1
+                            }
+                            echo "✅ Eureka is running"
 
                             # ── 4. Deploy Consultation Service ───────────────
                             echo "🏥 Deploying Consultation Service..."
@@ -109,22 +133,24 @@ pipeline {
                             kubectl --insecure-skip-tls-verify apply -f service.yaml    --namespace=neuroguard
 
                             kubectl --insecure-skip-tls-verify rollout status deployment/consultation-service \
-                                --namespace=neuroguard --timeout=300s || {
-                                echo "❌ Rollout failed. Debugging..."
+                                --namespace=neuroguard --timeout=600s || {
+                                echo "❌ Consultation Service rollout failed. Debugging..."
                                 kubectl --insecure-skip-tls-verify get pods -n neuroguard
-                                kubectl --insecure-skip-tls-verify describe pod \
-                                    -l app=consultation-service -n neuroguard
-                                kubectl --insecure-skip-tls-verify logs \
-                                    -l app=consultation-service -n neuroguard --tail=50 || true
+                                kubectl --insecure-skip-tls-verify describe pod -l app=consultation-service -n neuroguard
+                                kubectl --insecure-skip-tls-verify logs -l app=consultation-service -n neuroguard --tail=50 || true
                                 rm -f /tmp/kubeconfig
                                 exit 1
                             }
 
                             # ── Final Status ─────────────────────────────────
-                            echo "✅ All pods running:"
+                            echo ""
+                            echo "✅ All services deployed successfully!"
+                            echo ""
                             kubectl --insecure-skip-tls-verify get pods --namespace=neuroguard
                             echo ""
-                            echo "🌐 Service accessible at: http://192.168.33.10:30090"
+                            kubectl --insecure-skip-tls-verify get services --namespace=neuroguard
+                            echo ""
+                            echo "🌐 Consultation Service: http://192.168.33.10:30090"
 
                             rm -f /tmp/kubeconfig
                         """
