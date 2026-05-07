@@ -83,20 +83,20 @@ pipeline {
                     kubectl --insecure-skip-tls-verify apply -f mysql-pv.yaml
                     kubectl --insecure-skip-tls-verify apply -f mysql-pvc.yaml --namespace=neuroguard
 
-                    # Wait for PVC to be bound
-                    kubectl --insecure-skip-tls-verify wait pvc/mysql-pvc \
+                    # Check PVC status directly instead of using wait
+                    sleep 5
+                    PVC_STATUS=\$(kubectl --insecure-skip-tls-verify get pvc mysql-pvc \
                         --namespace=neuroguard \
-                        --for=condition=Bound \
-                        --timeout=60s || {
-                        echo "❌ PVC failed to bind. Debugging..."
-                        kubectl --insecure-skip-tls-verify get pv
-                        kubectl --insecure-skip-tls-verify get pvc -n neuroguard
+                        -o jsonpath='{.status.phase}')
+                    echo "PVC Status: \$PVC_STATUS"
+
+                    if [ "\$PVC_STATUS" != "Bound" ]; then
+                        echo "❌ PVC not bound. Status: \$PVC_STATUS"
                         kubectl --insecure-skip-tls-verify describe pvc mysql-pvc -n neuroguard
-                        kubectl --insecure-skip-tls-verify describe pv mysql-pv
                         rm -f /tmp/kubeconfig
                         exit 1
-                    }
-                    echo "✅ PVC bound"
+                    fi
+                    echo "✅ PVC bound successfully"
 
                     # ── 1. Deploy MySQL ──────────────────────────────────
                     echo "🗄️ Deploying MySQL..."
