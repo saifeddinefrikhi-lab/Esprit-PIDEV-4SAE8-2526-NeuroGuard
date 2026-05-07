@@ -81,17 +81,31 @@ pipeline {
                             # ── 0. Clean and recreate MySQL storage ──────────
                             echo "💾 Setting up MySQL Persistent Volume..."
 
-                            # Delete old PVC and PV to start fresh
+                            # Delete MySQL deployment FIRST and wait for pod to terminate
+                            kubectl --insecure-skip-tls-verify delete deployment mysql \
+                                --namespace=neuroguard --ignore-not-found=true
+
+                            # Wait for MySQL pod to fully terminate before wiping data
+                            echo "Waiting for MySQL pod to terminate..."
+                            kubectl --insecure-skip-tls-verify wait pod \
+                                -l app=mysql \
+                                --namespace=neuroguard \
+                                --for=delete \
+                                --timeout=60s 2>/dev/null || true
+                            sleep 5
+
+                            # Delete PVC and PV
                             kubectl --insecure-skip-tls-verify delete pvc mysql-pvc \
                                 --namespace=neuroguard --ignore-not-found=true
                             kubectl --insecure-skip-tls-verify delete pv mysql-pv \
                                 --ignore-not-found=true
                             sleep 5
 
-                            # Wipe MySQL data directory to avoid corruption
+                            # NOW safely wipe data (MySQL is fully stopped)
                             sudo rm -rf /data/mysql
                             sudo mkdir -p /data/mysql
                             sudo chmod 777 /data/mysql
+                            echo "✅ MySQL data directory cleaned"
 
                             # Recreate PV and PVC
                             kubectl --insecure-skip-tls-verify apply -f mysql-pv.yaml
@@ -104,7 +118,6 @@ pipeline {
                             echo "PVC Status: \$PVC_STATUS"
                             if [ "\$PVC_STATUS" != "Bound" ]; then
                                 echo "❌ PVC not bound."
-                                kubectl --insecure-skip-tls-verify describe pvc mysql-pvc -n neuroguard
                                 rm -f /tmp/kubeconfig
                                 exit 1
                             fi
