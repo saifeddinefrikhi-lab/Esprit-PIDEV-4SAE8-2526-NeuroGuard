@@ -40,12 +40,13 @@ pipeline {
                     junit allowEmptyResults: true,
                           testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
                     publishHTML([
-                        reportDir: "${SERVICE_DIR}/target/site/jacoco",
-                        reportFiles: 'index.html',
-                        reportName: 'JaCoCo Coverage Report',
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true
-                    ])
+    reportDir: 'target/site/jacoco',
+    reportFiles: 'index.html',
+    reportName: 'Code Coverage Report',
+    keepAll: true,
+    alwaysLinkToLastBuild: true,
+    allowMissing: false
+])
                 }
             }
         }
