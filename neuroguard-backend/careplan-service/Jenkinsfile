@@ -79,32 +79,34 @@ pipeline {
             }
         }
         stage('Trigger CD Pipeline') {
-            when {
-                branch 'hamza'
-            }
-            steps {
-                echo '✅ CI passed – triggering CD pipeline...'
-                script {
-                    try {
-                        def cdJobName = env.JOB_NAME.replaceFirst(/-CI$/, '-CD')
-                        def commitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-                        
-                        build job: cdJobName,
-                              parameters: [
-                                  string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}"),
-                                  string(name: 'COMMIT_SHA', value: commitSha)
-                              ],
-                              wait: false,
-                              propagate: false
-                        
-                        echo "✓ CD pipeline '${cdJobName}' triggered successfully"
-                    } catch (Exception e) {
-                        echo "⚠ Warning: Could not trigger CD pipeline: ${e.message}"
-                        echo "This might be expected if CD job is not configured yet"
-                    }
-                }
+    steps {
+        echo '✅ CI passed – triggering CD pipeline...'
+
+        script {
+            try {
+                def cdJobName = 'careplan-service-CD'
+
+                def commitSha = sh(
+                    returnStdout: true,
+                    script: 'git rev-parse HEAD'
+                ).trim()
+
+                build job: cdJobName,
+                    parameters: [
+                        string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}"),
+                        string(name: 'COMMIT_SHA', value: commitSha)
+                    ],
+                    wait: false,
+                    propagate: false
+
+                echo "✓ CD pipeline '${cdJobName}' triggered successfully"
+
+            } catch (Exception e) {
+                echo "⚠ Could not trigger CD pipeline: ${e.message}"
             }
         }
+    }
+}
     }
     post {
         always { cleanWs() }
