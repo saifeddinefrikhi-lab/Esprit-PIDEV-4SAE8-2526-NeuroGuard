@@ -50,33 +50,53 @@ pipeline {
         }
 
         stage('Push to DockerHub') {
-            steps {
-                echo "📤 Pushing image to DockerHub..."
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    dir("${SERVICE_DIR}") {
-                        sh """
-                            unstash 'docker-image'
-                            docker load -i docker-image.tar
-                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
-                            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                        """
-                        retry(3) {
-                            sh "docker push ${DOCKER_USER}/careplan-service:${DOCKER_TAG}"
-                        }
-                        sh '''
-                            docker logout
-                            docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/careplan-service:${DOCKER_TAG} || true
-                        '''
-                        script { env.DOCKERHUB_USER = DOCKER_USER }
-                        echo "✓ Docker image pushed successfully"
-                    }
+    steps {
+        echo "📤 Pushing image to DockerHub..."
+
+        unstash 'docker-image'
+
+        withCredentials([usernamePassword(
+            credentialsId: 'docker-hub',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+
+            dir("${SERVICE_DIR}") {
+
+                sh '''
+                    docker load -i docker-image.tar
+
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                        ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
+
+                    echo "${DOCKER_PASS}" | docker login \
+                        -u "${DOCKER_USER}" \
+                        --password-stdin
+                '''
+
+                retry(3) {
+                    sh '''
+                        docker push ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
+                    '''
                 }
+
+                sh '''
+                    docker logout
+
+                    docker rmi \
+                        ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                        ${DOCKER_USER}/careplan-service:${DOCKER_TAG} || true
+                '''
+
+                script {
+                    env.DOCKERHUB_USER = DOCKER_USER
+                }
+
+                echo "✓ Docker image pushed successfully"
             }
         }
+    }
+}
 
         stage('Pre-Deployment Checks') {
             steps {
