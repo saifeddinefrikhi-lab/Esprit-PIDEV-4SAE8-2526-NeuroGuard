@@ -99,24 +99,24 @@ pipeline {
 }
 
         stage('Pre-Deployment Checks') {
-    steps {
-        echo "🔍 Running pre-deployment checks..."
-
-        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-
-            sh '''
-                echo "✓ Verifying cluster connectivity..."
-                kubectl --kubeconfig=$KUBECONFIG \
-                    --insecure-skip-tls-verify cluster-info
-
-                echo ""
-                echo "✓ Checking available nodes..."
-                kubectl --kubeconfig=$KUBECONFIG \
-                    --insecure-skip-tls-verify get nodes
-            '''
-        }
-    }
-}
+            steps {
+                echo "🔍 Running pre-deployment checks..."
+                withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
+                    sh '''
+                        echo "${KUBECONFIG_B64}" > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
+                        
+                        echo "✓ Verifying cluster connectivity..."
+                        kubectl --insecure-skip-tls-verify cluster-info
+                        
+                        echo ""
+                        echo "✓ Checking available nodes..."
+                        kubectl --insecure-skip-tls-verify get nodes
+                        
+                        rm -f /tmp/kubeconfig
+                    '''
+                }
+            }
         }
 
         stage('Deploy to Kubernetes') {
