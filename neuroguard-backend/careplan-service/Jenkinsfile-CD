@@ -103,7 +103,7 @@ pipeline {
                 echo "🔍 Running pre-deployment checks..."
                 withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
                     sh '''
-                        echo "${KUBECONFIG_B64}" | base64 -d > /tmp/kubeconfig
+                        echo "${KUBECONFIG_B64}" > /tmp/kubeconfig
                         export KUBECONFIG=/tmp/kubeconfig
                         
                         echo "✓ Verifying cluster connectivity..."
@@ -126,7 +126,7 @@ pipeline {
                     dir("${K8S_DIR}") {
                         sh '''
                             # Decode and set kubeconfig
-                            echo "${KUBECONFIG_B64}" | base64 -d > /tmp/kubeconfig
+                            echo "${KUBECONFIG_B64}" > /tmp/kubeconfig
                             export KUBECONFIG=/tmp/kubeconfig
 
                             # Create namespace if it doesn't exist
@@ -193,7 +193,7 @@ pipeline {
                 echo "🏥 Running health checks..."
                 withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
                     sh '''
-                        echo "${KUBECONFIG_B64}" | base64 -d > /tmp/kubeconfig
+                        echo "${KUBECONFIG_B64}" > /tmp/kubeconfig
                         export KUBECONFIG=/tmp/kubeconfig
                         
                         READY_PODS=$(kubectl --insecure-skip-tls-verify get deployment careplan-service \
