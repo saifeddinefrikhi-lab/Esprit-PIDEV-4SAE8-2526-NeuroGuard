@@ -158,7 +158,7 @@ pipeline {
                     kubectl --insecure-skip-tls-verify apply -f service.yaml    --namespace=neuroguard
 
                     kubectl --insecure-skip-tls-verify rollout status deployment/consultation-service \
-                        --namespace=neuroguard --timeout=600s || {
+                        --namespace=neuroguard --timeout=900s || {
                         echo "❌ Consultation Service rollout failed. Debugging..."
                         kubectl --insecure-skip-tls-verify get pods -n neuroguard
                         kubectl --insecure-skip-tls-verify describe pod -l app=consultation-service -n neuroguard
