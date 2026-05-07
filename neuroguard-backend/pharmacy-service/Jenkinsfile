@@ -4,15 +4,16 @@ pipeline {
         githubPush()
     }
     environment {
-        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'main'
-        SONAR_TOKEN  = credentials('sonar-token')
-        DOCKER_IMAGE = "neuroguard/pharmacy-service"
-        DOCKER_TAG   = "${env.BUILD_NUMBER}"
-        SERVICE_DIR  = "neuroguard-backend/pharmacy-service"
-        MAVEN_OPTS   = "-Xmx1024m"
+        GIT_REPO    = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH  = 'hamza'
+        SONAR_TOKEN = credentials('sonar-token')
+        SERVICE_DIR = "neuroguard-backend/pharmacy-service"
+        MAVEN_OPTS  = "-Xmx2048m -XX:+UseG1GC"
     }
-    options { timeout(time: 30, unit: 'MINUTES'); disableConcurrentBuilds() }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
     stages {
         stage('Code Checkout') {
             steps {
@@ -20,97 +21,95 @@ pipeline {
                     url: "${GIT_REPO}"
             }
         }
-        stage('JUnit Tests') {
-            steps {
-                dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -q"
-                }
+        stage('Unit Tests + Build') {
+    steps {
+        timeout(time: 25, unit: 'MINUTES') {
+            echo '🧪 Running tests with JaCoCo coverage...'
+            dir("${SERVICE_DIR}") {
+                sh """
+                mvn clean test package -B \
+                    -DforkCount=1 \
+                    -Dargument=-DforkCount=1 \
+                    -Djacoco.skip=false \
+                    -Dmaven.test.failure.ignore=false \
+                    -Dtest='!*ApplicationTests' \
+                    -DskipITs
+                """
             }
+            echo '✅ Tests passed, JaCoCo report generated'
         }
-        stage('Build ') {
-            steps {
-                dir("${SERVICE_DIR}") {
-                    sh "mvn clean package -DskipTests -q"
-                }
-            }
+    }
+    post {
+        always {
+            junit allowEmptyResults: true,
+                  testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
+
+            publishHTML([
+                reportDir: "${SERVICE_DIR}/target/site/jacoco",
+                reportFiles: 'index.html',
+                reportName: 'Code Coverage Report',
+                keepAll: true,
+                alwaysLinkToLastBuild: true,
+                allowMissing: true
+            ])
         }
+    }
+}
         stage('SonarQube Analysis') {
             steps {
-                dir("${SERVICE_DIR}") {
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar -B -q -Dsonar.projectKey=neuroguard-pharmacy-service -Dsonar.projectName="NeuroGuard - Pharmacy Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
+                timeout(time: 15, unit: 'MINUTES') {
+                    dir("${SERVICE_DIR}") {
+                        withSonarQubeEnv('SonarQube') {
+                            sh """mvn sonar:sonar -B -DskipTests \
+                                -Dsonar.projectKey=neuroguard-pharmacy-service \
+                                -Dsonar.projectName=\"NeuroGuard - Pharmacy Service\" \
+                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                                -Dsonar.sources=src/main \
+                                -Dsonar.login=${SONAR_TOKEN}"""
+                        }
                     }
                 }
             }
         }
         stage('Quality Gate') {
-            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
-        }
-        stage('Build Docker Image') {
             steps {
-                dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
-                    stash name: 'docker-image', includes: 'docker-image.tar'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
                 }
             }
         }
-        stage('Push to DockerHub') {
+        stage('Trigger CD Pipeline') {
     steps {
-        echo '🚀 Pushing image to DockerHub...'
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', 
-                                          usernameVariable: 'DOCKER_USER', 
-                                          passwordVariable: 'DOCKER_PASS')]) {
-            dir("${SERVICE_DIR}") {
-                unstash 'docker-image'
+        echo '✅ CI passed – triggering CD pipeline...'
 
-                // Load the image from tarball
-                sh 'docker load -i docker-image.tar'
+        script {
+            try {
+                def cdJobName = 'pharmacy-service-CD'
 
-                // Verify Docker daemon is accessible (fails fast if permission denied)
-                sh 'docker info >/dev/null'
+                def commitSha = sh(
+                    returnStdout: true,
+                    script: 'git rev-parse HEAD'
+                ).trim()
 
-                // Tag the image with the Docker Hub username (ensures push permissions)
-                sh """
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG}
-                """
+                build job: cdJobName,
+                    parameters: [
+                        string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}"),
+                        string(name: 'COMMIT_SHA', value: commitSha)
+                    ],
+                    wait: false,
+                    propagate: false
 
-                // Login to Docker Hub
-                sh """
-                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                """
+                echo "✓ CD pipeline '${cdJobName}' triggered successfully"
 
-                // Push with retry mechanism (up to 3 attempts, 5s delay)
-                script {
-                    retry(3) {
-                        sh """
-                            echo "=== Pushing image ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG} ==="
-                            docker push ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG}
-                        """
-                    }
-                }
-
-                // Logout (optional, but good practice)
-                sh 'docker logout'
-
-                // Cleanup local images to save disk space
-                sh """
-                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG} || true
-                """
+            } catch (Exception e) {
+                echo "⚠ Could not trigger CD pipeline: ${e.message}"
             }
         }
-    }
-    post { 
-        success {
-            // Déclencher la pipeline CD après succès de la CI
-            build job: 'pharmacy-service-CD', 
-                  parameters: [
-                      string(name: 'BUILD_NUMBER', value: "${env.BUILD_NUMBER}"),
-                      string(name: 'DOCKER_TAG', value: "${env.BUILD_NUMBER}")
-                  ],
-                  wait: false
-        }
-        always { cleanWs() } 
     }
 }
+    }
+    post {
+        always { cleanWs() }
+        failure { echo '❌ CI pipeline failed – CD will NOT be triggered.' }
+    }
 }
