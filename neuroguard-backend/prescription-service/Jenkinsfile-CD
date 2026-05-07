@@ -214,10 +214,10 @@ pipeline {
                             kubectl scale deployment/prescription-service \
                                 --replicas=3 -n ${KUBE_NAMESPACE}
 
-                            # Attendre la fin du rollout (max 5 min)
+                            # Attendre la fin du rollout (max 15 min - Spring Boot + JPA init takes time)
                             echo "⏳ Waiting for prescription-service rollout..."
                             kubectl rollout status deployment/prescription-service \
-                                -n ${KUBE_NAMESPACE} --timeout=300s
+                                -n ${KUBE_NAMESPACE} --timeout=900s
 
                             echo "── Pods ─────────────────────────────────────────"
                             kubectl get pods -n ${KUBE_NAMESPACE}
