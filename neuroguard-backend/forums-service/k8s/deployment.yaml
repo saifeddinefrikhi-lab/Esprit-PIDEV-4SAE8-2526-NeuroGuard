@@ -36,3 +36,10 @@ spec:
               value: "false"
             - name: EUREKA_FETCH
               value: "false"
+          volumeMounts:
+            - name: upload-storage
+              mountPath: /app/uploads/post-images
+      volumes:
+        - name: upload-storage
+          persistentVolumeClaim:
+            claimName: forum-upload-pvc

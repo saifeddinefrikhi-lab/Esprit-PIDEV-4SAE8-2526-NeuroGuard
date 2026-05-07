@@ -151,8 +151,10 @@ pipeline {
                     dir("${SERVICE_DIR}") {
 
                         sh 'kubectl apply -f k8s/mysql.yaml'
+                        sh 'kubectl apply -f k8s/pvc.yaml'
                         sh 'kubectl apply -f k8s/deployment.yaml'
                         sh 'kubectl apply -f k8s/service.yaml'
+                        sh 'kubectl apply -f k8s/servicemonitor.yaml'
 
                         sh '''
                             kubectl set image deployment/forum-service \
