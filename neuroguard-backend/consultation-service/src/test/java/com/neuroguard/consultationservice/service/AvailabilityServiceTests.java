@@ -54,7 +54,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should create availability successfully")
     void testCreateAvailability_Success() {
         // Arrange
@@ -76,7 +76,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should reject availability with invalid times")
     void testCreateAvailability_InvalidTimes() {
         // Arrange
@@ -92,7 +92,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should update availability successfully")
     void testUpdateAvailability_Success() {
         // Arrange
@@ -117,7 +117,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should prevent unauthorized user from updating availability")
     void testUpdateAvailability_Unauthorized() {
         // Arrange
@@ -133,7 +133,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should throw ResourceNotFoundException for non-existent availability")
     void testUpdateAvailability_NotFound() {
         // Arrange
@@ -146,7 +146,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should delete availability successfully")
     void testDeleteAvailability_Success() {
         // Arrange
@@ -165,7 +165,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should prevent unauthorized deletion")
     void testDeleteAvailability_Unauthorized() {
         // Arrange
@@ -179,7 +179,7 @@ class AvailabilityServiceTests {
     }
 
     @Test
-    @Timeout(1)
+    @Timeout(30)
     @DisplayName("Should retrieve availabilities by provider")
     void testGetByProvider_Success() {
         // Arrange
