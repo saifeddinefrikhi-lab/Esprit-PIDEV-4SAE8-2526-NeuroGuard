@@ -80,6 +80,10 @@ pipeline {
 
                     # ── 0. Storage ────────────────────────────────────
                     echo "💾 Creating Persistent Volume..."
+                    # Clean data directory to avoid corruption from interrupted previous runs
+                    sudo rm -rf /data/mysql
+                    sudo mkdir -p /data/mysql  
+                    sudo chmod 777 /data/mysql
                     kubectl --insecure-skip-tls-verify apply -f mysql-pv.yaml
                     kubectl --insecure-skip-tls-verify apply -f mysql-pvc.yaml --namespace=neuroguard
 
