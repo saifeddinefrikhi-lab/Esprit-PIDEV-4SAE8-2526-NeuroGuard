@@ -8,7 +8,7 @@ pipeline {
         GIT_BRANCH  = 'hamza'
         SONAR_TOKEN = credentials('sonar-token')
         SERVICE_DIR = "neuroguard-backend/careplan-service"
-        MAVEN_OPTS  = "-Xmx1024m"
+        MAVEN_OPTS  = "-Xmx2048m -XX:+UseG1GC"
     }
     options {
         timeout(time: 30, unit: 'MINUTES')
@@ -23,11 +23,14 @@ pipeline {
         }
         stage('Unit Tests + Build') {
             steps {
-                timeout(time: 20, unit: 'MINUTES') {
+                timeout(time: 25, unit: 'MINUTES') {
                     echo '🧪 Running tests with JaCoCo coverage...'
                     dir("${SERVICE_DIR}") {
-                        sh "mvn clean test -B -DforkCount=1"
-                        sh "mvn package -DskipTests -B"
+                        sh """mvn clean test package -B \
+                            -DforkCount=1 \
+                            -Dargument=-DforkCount=1 \
+                            -Djacoco.skip=false \
+                            -Dmaven.test.failure.ignore=false"""
                     }
                     echo '✅ Tests passed, JaCoCo report generated'
                 }
@@ -36,6 +39,13 @@ pipeline {
                 always {
                     junit allowEmptyResults: true,
                           testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
+                    publishHTML([
+                        reportDir: "${SERVICE_DIR}/target/site/jacoco",
+                        reportFiles: 'index.html',
+                        reportName: 'JaCoCo Coverage Report',
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true
+                    ])
                 }
             }
         }
