@@ -20,7 +20,7 @@ spec:
       initContainers:
       - name: wait-for-mysql
         image: alpine:3.19
-        command: ['sh', '-c', 'until (echo > /dev/tcp/mysql.neuroguard.svc.cluster.local/3306) >/dev/null 2>&1; do echo "Waiting for MySQL..."; sleep 3; done; echo "MySQL is ready"; sleep 5']
+        command: ['sh', '-c', 'until (echo > /dev/tcp/pharmacy-mysql.neuroguard.svc.cluster.local/3306) >/dev/null 2>&1; do echo "Waiting for MySQL..."; sleep 3; done; echo "MySQL is ready"; sleep 5']
       containers:
       - name: pharmacy-service
         image: ameniferjeni/pharmacy-service:latest
@@ -39,7 +39,7 @@ spec:
         - name: SPRING_APPLICATION_NAME
           value: "pharmacy-service"
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:mysql://mysql.neuroguard.svc.cluster.local:3306/pharmacydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+          value: "jdbc:mysql://pharmacy-mysql.neuroguard.svc.cluster.local:3306/pharmacydb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
         - name: SPRING_DATASOURCE_USERNAME
           valueFrom:
             secretKeyRef:

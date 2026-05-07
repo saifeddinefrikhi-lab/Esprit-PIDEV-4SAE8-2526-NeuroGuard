@@ -73,23 +73,18 @@ pipeline {
                         sh '''
                             docker load -i docker-image.tar
 
-                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} \
-                                ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG}
-
                             echo "${DOCKER_PASS}" | docker login \
                                 -u "${DOCKER_USER}" \
                                 --password-stdin
                         '''
 
                         retry(3) {
-                            sh "docker push ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG}"
+                            sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
                         }
 
                         sh '''
                             docker logout
-                            docker rmi \
-                                ${DOCKER_IMAGE}:${DOCKER_TAG} \
-                                ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG} || true
+                            docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true
                         '''
 
                         script {
@@ -196,7 +191,7 @@ pipeline {
                             # Update image tag if different from deployment.yaml default
                             if [ "${DOCKER_TAG}" != "latest" ]; then
                                 kubectl set image deployment/pharmacy-service \
-                                    pharmacy-service=${DOCKERHUB_USER}/pharmacy-service:${DOCKER_TAG} \
+                                    pharmacy-service=${DOCKER_IMAGE}:${DOCKER_TAG} \
                                     -n ${KUBE_NAMESPACE}
                             fi
 
@@ -270,7 +265,7 @@ pipeline {
             echo """
             ✅ =====================================================
             ✅  pharmacy-service deployed successfully
-            ✅  Image     : ${env.DOCKERHUB_USER}/pharmacy-service:${DOCKER_TAG}
+            ✅  Image     : ${DOCKER_IMAGE}:${DOCKER_TAG}
             ✅  Namespace : ${KUBE_NAMESPACE}
             ✅ =====================================================
             """
