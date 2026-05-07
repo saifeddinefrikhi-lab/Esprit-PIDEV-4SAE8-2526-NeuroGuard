@@ -27,19 +27,19 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
-                  key: root-password
+                  key: MYSQL_ROOT_PASSWORD
             - name: MYSQL_DATABASE
               value: careplandb
             - name: MYSQL_USER
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
-                  key: username
+                  key: MYSQL_USER
             - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
-                  key: password
+                  key: MYSQL_PASSWORD
           resources:
             requests:
               cpu: 200m
@@ -52,11 +52,21 @@ spec:
               command:
                 - sh
                 - -c
-                - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
-            initialDelaySeconds: 20
+                - "mysqladmin ping -u root -prootpass --silent"
+            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "mysqladmin ping -u root -prootpass --silent"
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql
