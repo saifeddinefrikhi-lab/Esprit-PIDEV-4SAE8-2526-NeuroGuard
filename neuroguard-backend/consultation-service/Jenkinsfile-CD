@@ -106,7 +106,7 @@ pipeline {
                     sleep 5
                     kubectl --insecure-skip-tls-verify apply -f mysql-deployment.yaml --namespace=neuroguard
                     kubectl --insecure-skip-tls-verify rollout status deployment/mysql \
-                        --namespace=neuroguard --timeout=300s || {
+                        --namespace=neuroguard --timeout=600s || {
                         echo "❌ MySQL failed. Debugging..."
                         kubectl --insecure-skip-tls-verify get pods -n neuroguard
                         kubectl --insecure-skip-tls-verify describe pod -l app=mysql -n neuroguard
