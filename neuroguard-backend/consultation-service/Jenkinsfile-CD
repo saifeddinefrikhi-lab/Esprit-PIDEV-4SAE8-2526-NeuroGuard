@@ -74,7 +74,7 @@ pipeline {
 
                     kubectl --insecure-skip-tls-verify get nodes
 
-                    # Create namespace
+                    # Create namespace if not exists
                     kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || \
                     kubectl --insecure-skip-tls-verify create namespace neuroguard
 
@@ -100,9 +100,13 @@ pipeline {
 
                     # ── 1. Deploy MySQL ──────────────────────────────────
                     echo "🗄️ Deploying MySQL..."
+                    # Delete existing deployment to force fresh rollout
+                    kubectl --insecure-skip-tls-verify delete deployment mysql \
+                        --namespace=neuroguard --ignore-not-found=true
+                    sleep 5
                     kubectl --insecure-skip-tls-verify apply -f mysql-deployment.yaml --namespace=neuroguard
                     kubectl --insecure-skip-tls-verify rollout status deployment/mysql \
-                        --namespace=neuroguard --timeout=600s || {
+                        --namespace=neuroguard --timeout=300s || {
                         echo "❌ MySQL failed. Debugging..."
                         kubectl --insecure-skip-tls-verify get pods -n neuroguard
                         kubectl --insecure-skip-tls-verify describe pod -l app=mysql -n neuroguard
