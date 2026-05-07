@@ -26,24 +26,31 @@ spec:
                 name: eureka-server-config
             - secretRef:
                 name: eureka-server-secret
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8761
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 60      # 60 × 10s = 600s max startup time
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8761
-            initialDelaySeconds: 60    # Spring Boot needs time to start
+            initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8761
-            initialDelaySeconds: 120
+            initialDelaySeconds: 300  # ← only start liveness after 5 min
             periodSeconds: 20
             failureThreshold: 5
           resources:
             requests:
-              memory: "128Mi"
+              memory: "256Mi"
               cpu: "100m"
             limits:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: "512Mi"         # ← was 256Mi, too low for Spring Boot
+              cpu: "500m"

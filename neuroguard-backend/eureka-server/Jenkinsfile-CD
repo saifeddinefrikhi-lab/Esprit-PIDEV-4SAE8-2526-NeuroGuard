@@ -59,7 +59,7 @@ pipeline {
 
                             # Wait for rollout
                             kubectl --insecure-skip-tls-verify rollout status deployment/eureka-server \
-                                --namespace=neuroguard --timeout=300s || {
+                                --namespace=neuroguard --timeout=600s || {
                                 echo "❌ Eureka rollout failed. Debugging..."
                                 kubectl --insecure-skip-tls-verify get pods -n neuroguard
                                 kubectl --insecure-skip-tls-verify describe pod -l app=eureka-server -n neuroguard
