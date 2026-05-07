@@ -140,11 +140,97 @@ pipeline {
                             kubectl get namespace ${KUBE_NAMESPACE} \
                                 || kubectl create namespace ${KUBE_NAMESPACE}
 
-                            # Secret MySQL (root-password, username, password)
-                            kubectl apply -f mysql-secret.yaml -n ${KUBE_NAMESPACE}
+                            # Créer le secret MySQL via kubectl (évite les problèmes de fichier YAML corrompu)
+                            kubectl create secret generic mysql-secret \
+                                --from-literal=root-password=rootpass123 \
+                                --from-literal=username=careplan \
+                                --from-literal=password=careplanpass \
+                                -n ${KUBE_NAMESPACE} \
+                                --dry-run=client -o yaml | kubectl apply -f -
 
-                            # Deployment + Service MySQL
-                            kubectl apply -f mysql-deployment.yaml -n ${KUBE_NAMESPACE}
+                            # Deployment + Service MySQL générés inline (indépendant du repo)
+                            cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            - name: MYSQL_DATABASE
+              value: careplandb
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: username
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: password
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "mysqladmin ping -u root -prootpass123"
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app: mysql
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+  type: ClusterIP
+EOF
 
                             # Attendre que MySQL soit prêt avant de continuer
                             echo "⏳ Waiting for MySQL to be ready (max 3 min)..."
@@ -176,8 +262,12 @@ pipeline {
                             # ConfigMap (datasource MySQL + config Spring)
                             kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
 
-                            # Secret credentials DB careplan
-                            kubectl apply -f secret.yaml -n ${KUBE_NAMESPACE}
+                            # Secret credentials DB careplan via kubectl (évite les fichiers YAML corrompus)
+                            kubectl create secret generic careplan-db-secret \
+                                --from-literal=username=careplan \
+                                --from-literal=password=careplanpass \
+                                -n ${KUBE_NAMESPACE} \
+                                --dry-run=client -o yaml | kubectl apply -f -
 
                             # Patcher l image sans toucher au fichier YAML (plus fiable que sed)
                             kubectl set image deployment/careplan-service \
