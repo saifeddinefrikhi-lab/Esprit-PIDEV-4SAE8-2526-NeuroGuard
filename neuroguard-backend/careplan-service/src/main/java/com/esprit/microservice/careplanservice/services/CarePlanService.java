@@ -15,6 +15,8 @@ import com.esprit.microservice.careplanservice.exceptions.ResourceNotFoundExcept
 import com.esprit.microservice.careplanservice.feign.UserServiceClient;
 import com.esprit.microservice.careplanservice.repositories.CarePlanMessageRepository;
 import com.esprit.microservice.careplanservice.repositories.CarePlanRepository;
+import com.esprit.microservice.careplanservice.utils.Constants;
+import com.esprit.microservice.careplanservice.utils.ServiceUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -43,7 +45,7 @@ public class CarePlanService {
 
     private void broadcastCarePlanNotification(Long patientId, Object payload) {
         try {
-            messagingTemplate.convertAndSend("/topic/care-plans/" + patientId, payload);
+            messagingTemplate.convertAndSend(Constants.WEBSOCKET_CARE_PLANS_TOPIC + patientId, payload);
             log.info("Care plan notification sent to patient {}", patientId);
         } catch (Exception e) {
             log.error("Error broadcasting care plan notification: {}", e.getMessage(), e);
@@ -73,11 +75,10 @@ public class CarePlanService {
         }
     }
 
-    // Vérifie que le patient existe et a le rôle PATIENT
     private void validatePatient(Long patientId) {
         UserDto patient = userServiceClient.getUserById(patientId);
-        if (patient == null || !"PATIENT".equals(patient.getRole())) {
-            throw new ResourceNotFoundException("Patient not found or not a patient");
+        if (patient == null || !Constants.ROLE_PATIENT.equals(patient.getRole())) {
+            throw new ResourceNotFoundException(Constants.PATIENT_NOT_FOUND);
         }
     }
 
