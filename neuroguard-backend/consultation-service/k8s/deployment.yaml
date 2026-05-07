@@ -7,6 +7,7 @@ metadata:
     app: consultation-service
 spec:
   replicas: 1
+  progressDeadlineSeconds: 900    # ← ADD THIS — 15 minutes
   selector:
     matchLabels:
       app: consultation-service
@@ -49,21 +50,21 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8090
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120   # ← wait 2min before first check
             periodSeconds: 10
-            failureThreshold: 60      # ← 60 × 10s = 600s max startup time
+            failureThreshold: 60       # ← 60×10s = 600s max startup
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: 8090
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120   # ← same as startup
             periodSeconds: 10
             failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8090
-            initialDelaySeconds: 180
+            initialDelaySeconds: 300   # ← only start liveness after 5min
             periodSeconds: 20
             failureThreshold: 5
           resources:
