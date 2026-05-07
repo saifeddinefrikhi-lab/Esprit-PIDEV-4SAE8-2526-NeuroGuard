@@ -1,0 +1,30 @@
+pipeline {
+  agent any
+  parameters { string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build tag to deploy') }
+  environment {
+    DOCKER_IMAGE = "neuroguard/gateway"
+    SERVICE_DIR  = "neuroguard-backend/gateway"
+  }
+  stages {
+    stage('Deploy') {
+      steps {
+        withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
+          dir("${SERVICE_DIR}/k8s") {
+            sh '''
+              echo "${KUBECONFIG_B64}" | base64 -d > /tmp/kubeconfig
+              export KUBECONFIG=/tmp/kubeconfig
+              kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || kubectl --insecure-skip-tls-verify create namespace neuroguard
+              kubectl --insecure-skip-tls-verify apply -f configmap.yaml --namespace=neuroguard
+              kubectl --insecure-skip-tls-verify apply -f secret.yaml --namespace=neuroguard
+              sed -i "s|image: .*gateway.*|image: ${DOCKER_IMAGE}:${params.BUILD_NUMBER_CI}|" deployment.yaml || true
+              kubectl --insecure-skip-tls-verify apply -f deployment.yaml --namespace=neuroguard
+              kubectl --insecure-skip-tls-verify apply -f service.yaml --namespace=neuroguard
+              kubectl --insecure-skip-tls-verify rollout status deployment/gateway --namespace=neuroguard --timeout=300s
+              rm -f /tmp/kubeconfig
+            '''
+          }
+        }
+      }
+    }
+  }
+}

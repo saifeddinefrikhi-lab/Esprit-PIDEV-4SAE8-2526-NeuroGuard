@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: neuroguard
+data:
+  SERVER_PORT: "8083"
+  SPRING_APPLICATION_NAME: "gateway"
