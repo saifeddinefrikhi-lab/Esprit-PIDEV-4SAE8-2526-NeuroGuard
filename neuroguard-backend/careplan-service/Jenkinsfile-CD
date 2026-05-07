@@ -188,6 +188,9 @@ pipeline {
                             # Apply full deployment manifest to ensure complete spec (including init containers, probes, etc.)
                             kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
 
+                            # Force rollout restart to ensure new pods with updated spec are created
+                            kubectl rollout restart deployment/careplan-service -n ${KUBE_NAMESPACE}
+
                             # Update image tag if different from deployment.yaml default
                             if [ "${DOCKER_TAG}" != "latest" ]; then
                                 kubectl set image deployment/careplan-service \

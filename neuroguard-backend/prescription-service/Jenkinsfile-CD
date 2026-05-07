@@ -68,6 +68,10 @@ pipeline {
                             kubectl apply -f ${K8S_MANIFEST_DIR}/deployment.yaml
                             echo "✓ Deployment applied"
                             
+                            # Force rollout restart to ensure new pods with updated spec are created
+                            kubectl rollout restart deployment/${SERVICE_NAME} -n ${KUBE_NAMESPACE}
+                            echo "✓ Rollout restart triggered"
+                            
                             # Update image tag if different from deployment.yaml default
                             if [ "${DOCKER_TAG}" != "latest" ]; then
                                 kubectl set image deployment/${SERVICE_NAME} \
