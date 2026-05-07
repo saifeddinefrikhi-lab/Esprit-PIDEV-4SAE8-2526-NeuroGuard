@@ -91,7 +91,7 @@ pipeline {
                 }
             }
         }
-
+        /*
         stage('Push to DockerHub') {
             steps {
                 withCredentials([
@@ -136,7 +136,7 @@ pipeline {
                 }
             }
         }
-
+*/
         stage('Deploy to Kubernetes') {
             steps {
 
