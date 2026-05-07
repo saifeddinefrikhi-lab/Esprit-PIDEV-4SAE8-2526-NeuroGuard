@@ -44,8 +44,8 @@ pipeline {
                     dir("${SERVICE_DIR}") {
                         withSonarQubeEnv('SonarQube') {
                             sh """mvn sonar:sonar -B -DskipTests \
-                                -Dsonar.projectKey=neuroguard-consultation-service \
-                                -Dsonar.projectName=\"NeuroGuard - Consultation Service\" \
+                                -Dsonar.projectKey=neuroguard-careplan-service \
+                                -Dsonar.projectName=\"NeuroGuard - CarePlan Service\" \
                                 -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
                                 -Dsonar.sources=src/main \
                                 -Dsonar.login=${SONAR_TOKEN}"""
