@@ -23,20 +23,21 @@ pipeline {
         }
         stage('Unit Tests + Build') {
             steps {
-                timeout(time: 25, unit: 'MINUTES') {
+                timeout(time: 10, unit: 'MINUTES') {
                     echo '🧪 Running tests with JaCoCo coverage...'
                     dir("${SERVICE_DIR}") {
-                        sh """mvn clean test package -B \
-                            -DforkCount=1 \
-                            -Dargument=-DforkCount=1 \
-                            -Djacoco.skip=false \
-                            -Dmaven.test.failure.ignore=false \
-                            -Dtest=\!*ApplicationTests \
-                            -DskipITs"""
+                        sh "mvn test package -B -DforkCount=1"
                     }
                     echo '✅ Tests passed, JaCoCo report generated'
                 }
             }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
+                }
+            }
+        }
             post {
                 always {
                     junit allowEmptyResults: true,
