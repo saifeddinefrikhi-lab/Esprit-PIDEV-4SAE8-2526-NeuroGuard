@@ -39,23 +39,14 @@ pipeline {
             }
         }
         stage('SonarQube Analysis') {
-    steps {
-        dir("${SERVICE_DIR}") {
-            withSonarQubeEnv('SonarQube') {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    sh """
-                        mvn clean verify sonar:sonar -B -q \
-                        -Dsonar.projectKey=neuroguard-monitoring-service \
-                        -Dsonar.projectName="NeuroGuard - Monitoring Service" \
-                        -Dsonar.host.url=http://sonarqube:9000 \
-                        -Dsonar.token=$SONAR_TOKEN \
-                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                    """
+            steps {
+                dir("${SERVICE_DIR}") {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'mvn clean verify sonar:sonar -B -q -Dsonar.projectKey=neuroguard-monitoring-service -Dsonar.projectName="NeuroGuard - Monitoring Service" -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml'
+                    }
                 }
             }
         }
-    }
-}
         stage('Quality Gate') {
             steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
         }
