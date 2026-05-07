@@ -38,9 +38,16 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8761
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120   # ← was 30s, Eureka needs 2+ min to start
             periodSeconds: 10
-            failureThreshold: 6
+            failureThreshold: 12       # ← was 6, gives 2 more minutes of retries
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8761
+            initialDelaySeconds: 180   # ← start liveness check after 3 min
+            periodSeconds: 20
+            failureThreshold: 5
           resources:
             requests:
               memory: "256Mi"

@@ -132,9 +132,12 @@ pipeline {
 
                     # ── 3. Deploy Eureka ─────────────────────────────────
                     echo "🔍 Deploying Eureka..."
+                    kubectl --insecure-skip-tls-verify delete deployment eureka-server \
+                        --namespace=neuroguard --ignore-not-found=true
+                    sleep 5
                     kubectl --insecure-skip-tls-verify apply -f eureka-deployment.yaml --namespace=neuroguard
                     kubectl --insecure-skip-tls-verify rollout status deployment/eureka-server \
-                        --namespace=neuroguard --timeout=300s || {
+                        --namespace=neuroguard --timeout=600s || {
                         echo "❌ Eureka failed. Debugging..."
                         kubectl --insecure-skip-tls-verify get pods -n neuroguard
                         kubectl --insecure-skip-tls-verify describe pod -l app=eureka-server -n neuroguard
