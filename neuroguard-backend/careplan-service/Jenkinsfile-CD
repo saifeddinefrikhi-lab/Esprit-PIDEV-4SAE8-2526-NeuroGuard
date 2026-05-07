@@ -124,6 +124,9 @@ pipeline {
         // ──────────────────────────────────────────────────────────────────────
         stage('Deploy MySQL') {
         // ──────────────────────────────────────────────────────────────────────
+        // Déploie MySQL depuis les fichiers YAML du repo (corrigés)
+        // et attend qu'il soit prêt avant de continuer
+        // ──────────────────────────────────────────────────────────────────────
             steps {
                 echo "🗄️ Deploying MySQL..."
 
@@ -136,106 +139,19 @@ pipeline {
                             echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
                             export KUBECONFIG=${KUBECONFIG_TMP}
 
-                            # Créer le namespace si absent
-                            kubectl get namespace ${KUBE_NAMESPACE} \
-                                || kubectl create namespace ${KUBE_NAMESPACE}
+                            # Namespace
+                            kubectl apply -f namespace.yaml
 
-                            # Créer le secret MySQL via kubectl (évite les problèmes de fichier YAML corrompu)
-                            kubectl create secret generic mysql-secret \
-                                --from-literal=root-password=rootpass123 \
-                                --from-literal=username=careplan \
-                                --from-literal=password=careplanpass \
-                                -n ${KUBE_NAMESPACE} \
-                                --dry-run=client -o yaml | kubectl apply -f -
+                            # Secret MySQL — fichier corrigé (apiVersion était "piVersion")
+                            kubectl apply -f mysql-secret.yaml
 
-                            # Deployment + Service MySQL générés inline (indépendant du repo)
-                            cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mysql
-  namespace: ${KUBE_NAMESPACE}
-  labels:
-    app: mysql
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mysql
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app: mysql
-    spec:
-      containers:
-        - name: mysql
-          image: mysql:8.0
-          ports:
-            - containerPort: 3306
-          env:
-            - name: MYSQL_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: root-password
-            - name: MYSQL_DATABASE
-              value: careplandb
-            - name: MYSQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: username
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: password
-          resources:
-            requests:
-              cpu: 200m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-          readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - "mysqladmin ping -u root -prootpass123"
-            initialDelaySeconds: 20
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
-          volumeMounts:
-            - name: mysql-data
-              mountPath: /var/lib/mysql
-      volumes:
-        - name: mysql-data
-          emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql
-  namespace: ${KUBE_NAMESPACE}
-  labels:
-    app: mysql
-spec:
-  selector:
-    app: mysql
-  ports:
-    - port: 3306
-      targetPort: 3306
-  type: ClusterIP
-EOF
+                            # Deployment + Service MySQL — readinessProbe corrigée
+                            kubectl apply -f mysql-deployment.yaml
 
-                            # Attendre que MySQL soit prêt avant de continuer
-                            echo "⏳ Waiting for MySQL to be ready (max 3 min)..."
+                            # Attendre que MySQL soit opérationnel (max 4 min)
+                            echo "⏳ Waiting for MySQL to be ready..."
                             kubectl rollout status deployment/mysql \
-                                -n ${KUBE_NAMESPACE} --timeout=180s
+                                -n ${KUBE_NAMESPACE} --timeout=240s
 
                             echo "✓ MySQL is ready"
                         '''
@@ -259,17 +175,17 @@ EOF
                             echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
                             export KUBECONFIG=${KUBECONFIG_TMP}
 
-                            # ConfigMap (datasource MySQL + config Spring)
+                            # ConfigMap — contient maintenant la datasource MySQL
                             kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
 
-                            # Secret credentials DB careplan via kubectl (évite les fichiers YAML corrompus)
+                            # Secret credentials DB careplan
                             kubectl create secret generic careplan-db-secret \
                                 --from-literal=username=careplan \
                                 --from-literal=password=careplanpass \
                                 -n ${KUBE_NAMESPACE} \
                                 --dry-run=client -o yaml | kubectl apply -f -
 
-                            # Patcher l image sans toucher au fichier YAML (plus fiable que sed)
+                            # Mettre à jour l'image sans modifier le fichier YAML
                             kubectl set image deployment/careplan-service \
                                 careplan-service=${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG} \
                                 -n ${KUBE_NAMESPACE} 2>/dev/null \
@@ -280,18 +196,18 @@ EOF
                                 kubectl apply -f service.yaml -n ${KUBE_NAMESPACE}
                             fi
 
-                            # Forcer 1 réplica : nœud single-node Vagrant, CPU limité
+                            # 1 réplica : nœud single-node Vagrant, CPU limité
                             kubectl scale deployment/careplan-service \
                                 --replicas=1 -n ${KUBE_NAMESPACE}
 
-                            # Attendre la fin du rollout
-                            echo "⏳ Waiting for careplan-service rollout (max 5 min)..."
+                            # Attendre la fin du rollout (max 5 min)
+                            echo "⏳ Waiting for careplan-service rollout..."
                             kubectl rollout status deployment/careplan-service \
                                 -n ${KUBE_NAMESPACE} --timeout=300s
 
-                            echo "── Pods ────────────────────────────────────────"
+                            echo "── Pods ─────────────────────────────────────────"
                             kubectl get pods -n ${KUBE_NAMESPACE}
-                            echo "── Services ────────────────────────────────────"
+                            echo "── Services ─────────────────────────────────────"
                             kubectl get svc  -n ${KUBE_NAMESPACE}
                         '''
                     }
@@ -329,7 +245,7 @@ EOF
                             echo "❌ careplan-service not ready (${READY}/${DESIRED} pods)"
                             kubectl describe pods \
                                 -n ${KUBE_NAMESPACE} \
-                                -l app=careplan-service | tail -30
+                                -l app=careplan-service | tail -40
                             exit 1
                         fi
                     '''
@@ -352,7 +268,6 @@ EOF
         }
 
         failure {
-            // Rollback automatique de careplan-service en cas d'échec
             withCredentials([string(
                 credentialsId: 'kubeconfig-b64',
                 variable: 'KUBECONFIG_B64'
@@ -361,12 +276,20 @@ EOF
                     echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
                     export KUBECONFIG=${KUBECONFIG_TMP}
 
-                    echo "⏪ Rolling back careplan-service to previous version..."
-                    kubectl rollout undo deployment/careplan-service \
-                        -n ${KUBE_NAMESPACE} || true
+                    # Rollback uniquement si careplan-service a déjà un historique
+                    HISTORY=$(kubectl rollout history deployment/careplan-service \
+                        -n ${KUBE_NAMESPACE} 2>/dev/null | wc -l || echo 0)
+
+                    if [ "$HISTORY" -gt "2" ]; then
+                        echo "⏪ Rolling back careplan-service..."
+                        kubectl rollout undo deployment/careplan-service \
+                            -n ${KUBE_NAMESPACE} || true
+                    else
+                        echo "⚠ No rollback history available — skipping rollback"
+                    fi
 
                     echo "❌ ====================================================="
-                    echo "❌  Pipeline FAILED — rollback triggered"
+                    echo "❌  Pipeline FAILED"
                     echo "❌  Check logs above for root cause"
                     echo "❌ ====================================================="
                 '''
@@ -374,7 +297,6 @@ EOF
         }
 
         always {
-            // Suppression du kubeconfig temporaire dans tous les cas
             sh "rm -f ${KUBECONFIG_TMP} || true"
             cleanWs()
         }
