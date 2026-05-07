@@ -17,9 +17,13 @@ spec:
         app: prescription-service
         version: v1
     spec:
+      initContainers:
+      - name: wait-for-mysql
+        image: alpine:3.19
+        command: ['sh', '-c', 'until (echo > /dev/tcp/mysql.neuroguard.svc.cluster.local/3306) >/dev/null 2>&1; do echo "Waiting for MySQL..."; sleep 3; done; echo "MySQL is ready"; sleep 5']
       containers:
       - name: prescription-service
-        image: neuroguard/prescription-service:latest
+        image: ameniferjeni/prescription-service:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8089
@@ -34,6 +38,18 @@ spec:
           value: "http://eureka-server.neuroguard.svc.cluster.local:8761/eureka"
         - name: SPRING_APPLICATION_NAME
           value: "prescription-service"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:mysql://mysql.neuroguard.svc.cluster.local:3306/prescriptiondb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: prescription-db-secret
+              key: username
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: prescription-db-secret
+              key: password
         resources:
           requests:
             memory: "512Mi"
