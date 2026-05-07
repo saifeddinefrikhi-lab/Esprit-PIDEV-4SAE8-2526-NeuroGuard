@@ -4,9 +4,13 @@ metadata:
   name: reservation-service-config
   namespace: neuroguard
 data:
-  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/reservationdb?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC"
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/reservation_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
   SPRING_DATASOURCE_USERNAME: "root"
   SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.MySQLDialect"
   SPRING_JPA_SHOW_SQL: "false"
+  SPRING_REDIS_HOST: "redis-service"
+  SPRING_REDIS_PORT: "6379"
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka"
-  SERVER_PORT: "8087"
+  SERVER_PORT: "8094"
+  USER_SERVICE_URL: "http://user-service:8081"
