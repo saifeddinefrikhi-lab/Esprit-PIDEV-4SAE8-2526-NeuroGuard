@@ -72,24 +72,30 @@ pipeline {
                     kubectl --insecure-skip-tls-verify get nodes
 
                     # Create namespace if it doesn't exist
-                    kubectl get namespace neuroguard 2>/dev/null || kubectl create namespace neuroguard
+                    kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || kubectl --insecure-skip-tls-verify create namespace neuroguard
 
                     # Apply configmap and secret
-                    kubectl apply -f configmap.yaml --namespace=neuroguard
-                    kubectl apply -f secret.yaml    --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify apply -f configmap.yaml --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify apply -f secret.yaml    --namespace=neuroguard
 
                     # Update image tag in deployment.yaml
                     sed -i "s|image: .*consultation-service.*|image: ${DOCKERHUB_USER}/consultation-service:${DOCKER_TAG}|" deployment.yaml
 
                     # Apply all manifests
-                    kubectl apply -f deployment.yaml --namespace=neuroguard
-                    kubectl apply -f service.yaml    --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify apply -f deployment.yaml --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify apply -f service.yaml    --namespace=neuroguard
 
-                    # Wait for rollout
-                    kubectl rollout status deployment/consultation-service --namespace=neuroguard --timeout=120s
+                    # Wait for rollout (increased timeout to 300s for image pull)
+                    kubectl --insecure-skip-tls-verify rollout status deployment/consultation-service --namespace=neuroguard --timeout=300s || {
+                        echo "Rollout failed. Debugging pod status..."
+                        kubectl --insecure-skip-tls-verify get pods -n neuroguard
+                        kubectl --insecure-skip-tls-verify describe pod -l app=consultation-service -n neuroguard
+                        kubectl --insecure-skip-tls-verify logs -l app=consultation-service -n neuroguard --tail=50 || true
+                        exit 1
+                    }
 
                     # Show running pods
-                    kubectl get pods -l app=consultation-service --namespace=neuroguard
+                    kubectl --insecure-skip-tls-verify get pods -l app=consultation-service --namespace=neuroguard
 
                     # Cleanup temp kubeconfig
                     rm -f /tmp/kubeconfig
