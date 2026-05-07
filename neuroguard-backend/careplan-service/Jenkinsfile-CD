@@ -98,92 +98,63 @@ pipeline {
     }
 }
 
-        stage('Pre-Deployment Checks') {
-    steps {
-        echo '🔍 Running pre-deployment checks...'
+         stage('Pre-Deployment Checks') {
+            steps {
+                echo "🔍 Checking Kubernetes cluster..."
 
-        withCredentials([
-            string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')
-        ]) {
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
 
-            sh '''
-                echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
+                    sh '''
+                        echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
 
-                export KUBECONFIG=/tmp/kubeconfig
-
-                echo "✓ Verifying cluster connectivity..."
-                kubectl cluster-info
-
-                echo "✓ Nodes:"
-                kubectl get nodes
-            '''
+                        kubectl cluster-info
+                        kubectl get nodes
+                    '''
+                }
+            }
         }
-    }
-}
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo "☸️  Deploying careplan-service to Kubernetes..."
-                withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
+                echo "☸️ Deploying service..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+
                     dir("${K8S_DIR}") {
+
                         sh '''
-                            # Decode and set kubeconfig
-                            echo "${KUBECONFIG_B64}" > /tmp/kubeconfig
+                            echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
                             export KUBECONFIG=/tmp/kubeconfig
 
-                            # Create namespace if it doesn't exist
-                            echo "📋 Ensuring namespace ${KUBE_NAMESPACE} exists..."
-                            kubectl --insecure-skip-tls-verify get namespace ${KUBE_NAMESPACE} 2>/dev/null || \
-                            kubectl --insecure-skip-tls-verify create namespace ${KUBE_NAMESPACE}
+                            kubectl get namespace ${KUBE_NAMESPACE} || \
+                                kubectl create namespace ${KUBE_NAMESPACE}
 
-                            # Apply ConfigMap and Secrets
-                            echo "⚙️ Applying ConfigMap..."
-                            kubectl --insecure-skip-tls-verify apply -f configmap.yaml --namespace=${KUBE_NAMESPACE}
-                            
+                            kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
+
                             if [ -f secret.yaml ]; then
-                                echo "🔐 Applying Secret..."
-                                kubectl --insecure-skip-tls-verify apply -f secret.yaml --namespace=${KUBE_NAMESPACE}
+                                kubectl apply -f secret.yaml -n ${KUBE_NAMESPACE}
                             fi
 
-                            # Update deployment image
-                            echo "🏥 Updating careplan-service deployment..."
-                            if [ -f deployment.yaml ]; then
-                                sed -i "s|image: .*careplan-service.*|image: ${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG}|g" deployment.yaml
-                                kubectl --insecure-skip-tls-verify apply -f deployment.yaml --namespace=${KUBE_NAMESPACE}
-                            fi
+                            sed -i "s|image: .*careplan-service.*|image: ${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG}|g" deployment.yaml
 
-                            # Apply service
+                            kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
+
                             if [ -f service.yaml ]; then
-                                echo "📡 Applying service..."
-                                kubectl --insecure-skip-tls-verify apply -f service.yaml --namespace=${KUBE_NAMESPACE}
+                                kubectl apply -f service.yaml -n ${KUBE_NAMESPACE}
                             fi
 
-                            # Wait for rollout
-                            echo "⏳ Waiting for careplan-service to be ready..."
-                            kubectl --insecure-skip-tls-verify rollout status deployment/careplan-service \
-                                --namespace=${KUBE_NAMESPACE} --timeout=300s || {
-                                echo "❌ Rollout failed. Debugging..."
-                                kubectl --insecure-skip-tls-verify get pods -n ${KUBE_NAMESPACE} -l app=careplan-service
-                                kubectl --insecure-skip-tls-verify describe pod \
-                                    -l app=careplan-service -n ${KUBE_NAMESPACE}
-                                kubectl --insecure-skip-tls-verify logs \
-                                    -l app=careplan-service -n ${KUBE_NAMESPACE} --tail=100 || true
-                                rm -f /tmp/kubeconfig
-                                exit 1
-                            }
+                            kubectl rollout status deployment/careplan-service \
+                                -n ${KUBE_NAMESPACE} --timeout=300s
 
-                            # Display status
-                            echo ""
-                            echo "✅ Deployment Status:"
-                            echo "===================="
-                            kubectl --insecure-skip-tls-verify get pods -n ${KUBE_NAMESPACE} -l app=careplan-service -o wide
-                            
-                            echo ""
-                            echo "Service Information:"
-                            echo "===================="
-                            kubectl --insecure-skip-tls-verify get svc careplan-service -n ${KUBE_NAMESPACE} -o wide || echo "Service might be pending..."
-
-                            rm -f /tmp/kubeconfig
+                            kubectl get pods -n ${KUBE_NAMESPACE}
+                            kubectl get svc -n ${KUBE_NAMESPACE}
                         '''
                     }
                 }
@@ -192,26 +163,32 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                echo "🏥 Running health checks..."
-                withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
+                echo "🏥 Health check..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+
                     sh '''
-                        echo "${KUBECONFIG_B64}" > /tmp/kubeconfig
+                        echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
                         export KUBECONFIG=/tmp/kubeconfig
-                        
-                        READY_PODS=$(kubectl --insecure-skip-tls-verify get deployment careplan-service \
-                            -n ${KUBE_NAMESPACE} -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
-                        DESIRED_PODS=$(kubectl --insecure-skip-tls-verify get deployment careplan-service \
-                            -n ${KUBE_NAMESPACE} -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "1")
-                        
-                        echo "Pod Status: ${READY_PODS}/${DESIRED_PODS} ready"
-                        
-                        if [ "${READY_PODS}" = "${DESIRED_PODS}" ] && [ "${READY_PODS}" != "0" ]; then
-                            echo "✓ All careplan-service pods are healthy"
+
+                        READY=$(kubectl get deployment careplan-service \
+                            -n ${KUBE_NAMESPACE} \
+                            -o jsonpath='{.status.readyReplicas}' || echo 0)
+
+                        DESIRED=$(kubectl get deployment careplan-service \
+                            -n ${KUBE_NAMESPACE} \
+                            -o jsonpath='{.spec.replicas}' || echo 1)
+
+                        echo "Pods: $READY/$DESIRED"
+
+                        if [ "$READY" = "$DESIRED" ] && [ "$READY" != "0" ]; then
+                            echo "✅ Service healthy"
                         else
-                            echo "⚠ Not all pods are ready yet. This may be normal during startup."
+                            echo "⚠ Service not fully ready"
                         fi
-                        
-                        rm -f /tmp/kubeconfig
                     '''
                 }
             }
@@ -219,25 +196,27 @@ pipeline {
     }
 
     post {
+        success {
+            echo """
+            ✅ =====================================================
+            ✅ careplan-service deployed successfully
+            ✅ Image: ${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG}
+            ✅ Namespace: ${KUBE_NAMESPACE}
+            ✅ =====================================================
+            """
+        }
+
+        failure {
+            echo """
+            ❌ =====================================================
+            ❌ Pipeline FAILED
+            ❌ Check logs above
+            ❌ =====================================================
+            """
+        }
+
         always {
             cleanWs()
-        }
-        success {
-            echo '''
-            ✅ ================================================================
-            ✅ careplan-service deployed successfully!
-            ✅ Image: ${DOCKER_IMAGE}:${DOCKER_TAG}
-            ✅ Namespace: ${KUBE_NAMESPACE}
-            ✅ ================================================================
-            '''
-        }
-        failure {
-            echo '''
-            ❌ ================================================================
-            ❌ CD pipeline failed for careplan-service
-            ❌ Check logs above for details
-            ❌ ================================================================
-            '''
         }
     }
 }
