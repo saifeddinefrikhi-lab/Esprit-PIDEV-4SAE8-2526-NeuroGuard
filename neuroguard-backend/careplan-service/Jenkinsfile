@@ -24,8 +24,7 @@ pipeline {
         stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B"
-                }
+sh "mvn clean test jacoco:report -B -DforkCount=0"                }
             }
             post {
                 always {
