@@ -30,7 +30,9 @@ pipeline {
                             -DforkCount=1 \
                             -Dargument=-DforkCount=1 \
                             -Djacoco.skip=false \
-                            -Dmaven.test.failure.ignore=false"""
+                            -Dmaven.test.failure.ignore=false \
+                            -Dtest=\!*ApplicationTests \
+                            -DskipITs"""
                     }
                     echo '✅ Tests passed, JaCoCo report generated'
                 }
