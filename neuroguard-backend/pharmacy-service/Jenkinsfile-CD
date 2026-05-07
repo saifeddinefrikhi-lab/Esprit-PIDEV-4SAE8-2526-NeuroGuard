@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_IMAGE   = "neuroguard/pharmacy-service"
+        SERVICE_NAME   = "pharmacy-service"
         DOCKER_TAG     = "${params.BUILD_NUMBER_CI}"
         SERVICE_DIR    = "neuroguard-backend/pharmacy-service"
         K8S_DIR        = "neuroguard-backend/k8s/pharmacy-service"
@@ -46,6 +46,16 @@ pipeline {
         stage('Build Docker Image') {
         // ──────────────────────────────────────────────────────────────────────
             steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-hub',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        env.DOCKER_IMAGE = "${DOCKER_USER}/${SERVICE_NAME}"
+                    }
+                }
+                
                 echo "🔨 Building Docker image ${DOCKER_IMAGE}:${DOCKER_TAG}..."
                 dir("${SERVICE_DIR}") {
                     sh "mvn clean package -DskipTests -B -q"
@@ -61,7 +71,7 @@ pipeline {
         stage('Push to DockerHub') {
         // ──────────────────────────────────────────────────────────────────────
             steps {
-                echo "📤 Pushing image to DockerHub..."
+                echo "📤 Pushing image to DockerHub as ${DOCKER_IMAGE}:${DOCKER_TAG}..."
                 unstash 'docker-image'
 
                 withCredentials([usernamePassword(
@@ -89,9 +99,10 @@ pipeline {
 
                         script {
                             env.DOCKERHUB_USER = DOCKER_USER
+                            env.DOCKER_IMAGE_FINAL = "${DOCKER_IMAGE}:${DOCKER_TAG}"
                         }
 
-                        echo "✓ Docker image pushed successfully"
+                        echo "✓ Docker image pushed successfully to ${DOCKER_IMAGE}:${DOCKER_TAG}"
                     }
                 }
             }
@@ -171,6 +182,7 @@ pipeline {
                         sh '''
                             echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
                             export KUBECONFIG=${KUBECONFIG_TMP}
+                            DOCKER_IMAGE_FINAL="''' + env.DOCKER_IMAGE_FINAL + '''"
 
                             # ConfigMap
                             kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
@@ -188,12 +200,10 @@ pipeline {
                             # Force rollout restart to ensure new pods with updated spec are created
                             kubectl rollout restart deployment/pharmacy-service -n ${KUBE_NAMESPACE}
 
-                            # Update image tag if different from deployment.yaml default
-                            if [ "${DOCKER_TAG}" != "latest" ]; then
-                                kubectl set image deployment/pharmacy-service \
-                                    pharmacy-service=${DOCKER_IMAGE}:${DOCKER_TAG} \
-                                    -n ${KUBE_NAMESPACE}
-                            fi
+                            # Update image tag to match what was pushed
+                            kubectl set image deployment/pharmacy-service \
+                                pharmacy-service="${DOCKER_IMAGE_FINAL}" \
+                                -n ${KUBE_NAMESPACE}
 
                             # Service
                             if [ -f service.yaml ]; then
@@ -265,7 +275,7 @@ pipeline {
             echo """
             ✅ =====================================================
             ✅  pharmacy-service deployed successfully
-            ✅  Image     : ${DOCKER_IMAGE}:${DOCKER_TAG}
+            ✅  Image     : ${env.DOCKER_IMAGE_FINAL}
             ✅  Namespace : ${KUBE_NAMESPACE}
             ✅ =====================================================
             """
