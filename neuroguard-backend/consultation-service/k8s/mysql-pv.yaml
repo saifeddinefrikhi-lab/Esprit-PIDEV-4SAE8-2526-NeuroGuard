@@ -10,6 +10,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
   hostPath:
-    path: /data/mysql          # stored on the VM disk
+    path: /data/mysql
     type: DirectoryOrCreate

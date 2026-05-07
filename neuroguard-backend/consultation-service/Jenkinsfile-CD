@@ -78,7 +78,7 @@ pipeline {
                     kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || \
                     kubectl --insecure-skip-tls-verify create namespace neuroguard
 
-                    # ── 0. Storage (PV is cluster-scoped, no namespace) ───
+                    # ── 0. Storage ────────────────────────────────────
                     echo "💾 Creating Persistent Volume..."
                     kubectl --insecure-skip-tls-verify apply -f mysql-pv.yaml
                     kubectl --insecure-skip-tls-verify apply -f mysql-pvc.yaml --namespace=neuroguard
@@ -87,7 +87,15 @@ pipeline {
                     kubectl --insecure-skip-tls-verify wait pvc/mysql-pvc \
                         --namespace=neuroguard \
                         --for=condition=Bound \
-                        --timeout=30s
+                        --timeout=60s || {
+                        echo "❌ PVC failed to bind. Debugging..."
+                        kubectl --insecure-skip-tls-verify get pv
+                        kubectl --insecure-skip-tls-verify get pvc -n neuroguard
+                        kubectl --insecure-skip-tls-verify describe pvc mysql-pvc -n neuroguard
+                        kubectl --insecure-skip-tls-verify describe pv mysql-pv
+                        rm -f /tmp/kubeconfig
+                        exit 1
+                    }
                     echo "✅ PVC bound"
 
                     # ── 1. Deploy MySQL ──────────────────────────────────
