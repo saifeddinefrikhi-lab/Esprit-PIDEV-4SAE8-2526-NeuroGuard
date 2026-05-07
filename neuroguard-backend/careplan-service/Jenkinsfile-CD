@@ -185,11 +185,15 @@ pipeline {
                                 -n ${KUBE_NAMESPACE} \
                                 --dry-run=client -o yaml | kubectl apply -f -
 
-                            # Mettre à jour l'image sans modifier le fichier YAML
-                            kubectl set image deployment/careplan-service \
-                                careplan-service=${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG} \
-                                -n ${KUBE_NAMESPACE} 2>/dev/null \
-                            || kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
+                            # Apply full deployment manifest to ensure complete spec (including init containers, probes, etc.)
+                            kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
+
+                            # Update image tag if different from deployment.yaml default
+                            if [ "${DOCKER_TAG}" != "latest" ]; then
+                                kubectl set image deployment/careplan-service \
+                                    careplan-service=${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG} \
+                                    -n ${KUBE_NAMESPACE}
+                            fi
 
                             # Service
                             if [ -f service.yaml ]; then
