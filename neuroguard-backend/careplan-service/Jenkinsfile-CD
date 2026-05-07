@@ -1,29 +1,33 @@
 pipeline {
     agent any
-    
+
     parameters {
         string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build number from CI pipeline')
         string(name: 'COMMIT_SHA',      defaultValue: '',       description: 'Exact commit SHA produced by CI')
     }
-    
+
     environment {
-        DOCKER_IMAGE = "neuroguard/careplan-service"
-        DOCKER_TAG   = "${params.BUILD_NUMBER_CI}"
-        SERVICE_DIR  = "neuroguard-backend/careplan-service"
-        K8S_DIR      = "neuroguard-backend/k8s/careplan-service"
-        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
-        GIT_BRANCH   = 'hamza'
+        DOCKER_IMAGE   = "neuroguard/careplan-service"
+        DOCKER_TAG     = "${params.BUILD_NUMBER_CI}"
+        SERVICE_DIR    = "neuroguard-backend/careplan-service"
+        K8S_DIR        = "neuroguard-backend/k8s/careplan-service"
+        GIT_REPO       = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH     = 'hamza'
         KUBE_NAMESPACE = "neuroguard"
+        KUBECONFIG_TMP = "/tmp/kubeconfig-${BUILD_NUMBER}"
     }
-    
+
     options {
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
         skipDefaultCheckout(true)
     }
-    
+
     stages {
+
+        // ──────────────────────────────────────────────────────────────────────
         stage('Code Checkout') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
                 echo "📦 Checking out code from ${GIT_REPO}..."
                 git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
@@ -36,7 +40,9 @@ pipeline {
             }
         }
 
+        // ──────────────────────────────────────────────────────────────────────
         stage('Build Docker Image') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
                 echo "🔨 Building Docker image ${DOCKER_IMAGE}:${DOCKER_TAG}..."
                 dir("${SERVICE_DIR}") {
@@ -49,56 +55,54 @@ pipeline {
             }
         }
 
+        // ──────────────────────────────────────────────────────────────────────
         stage('Push to DockerHub') {
-    steps {
-        echo "📤 Pushing image to DockerHub..."
+        // ──────────────────────────────────────────────────────────────────────
+            steps {
+                echo "📤 Pushing image to DockerHub..."
+                unstash 'docker-image'
 
-        unstash 'docker-image'
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    dir("${SERVICE_DIR}") {
+                        sh '''
+                            docker load -i docker-image.tar
 
-        withCredentials([usernamePassword(
-            credentialsId: 'docker-hub',
-            usernameVariable: 'DOCKER_USER',
-            passwordVariable: 'DOCKER_PASS'
-        )]) {
+                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
 
-            dir("${SERVICE_DIR}") {
+                            echo "${DOCKER_PASS}" | docker login \
+                                -u "${DOCKER_USER}" \
+                                --password-stdin
+                        '''
 
-                sh '''
-                    docker load -i docker-image.tar
+                        retry(3) {
+                            sh "docker push ${DOCKER_USER}/careplan-service:${DOCKER_TAG}"
+                        }
 
-                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} \
-                        ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
+                        sh '''
+                            docker logout
+                            docker rmi \
+                                ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                ${DOCKER_USER}/careplan-service:${DOCKER_TAG} || true
+                        '''
 
-                    echo "${DOCKER_PASS}" | docker login \
-                        -u "${DOCKER_USER}" \
-                        --password-stdin
-                '''
+                        script {
+                            env.DOCKERHUB_USER = DOCKER_USER
+                        }
 
-                retry(3) {
-                    sh '''
-                        docker push ${DOCKER_USER}/careplan-service:${DOCKER_TAG}
-                    '''
+                        echo "✓ Docker image pushed successfully"
+                    }
                 }
-
-                sh '''
-                    docker logout
-
-                    docker rmi \
-                        ${DOCKER_IMAGE}:${DOCKER_TAG} \
-                        ${DOCKER_USER}/careplan-service:${DOCKER_TAG} || true
-                '''
-
-                script {
-                    env.DOCKERHUB_USER = DOCKER_USER
-                }
-
-                echo "✓ Docker image pushed successfully"
             }
         }
-    }
-}
 
-         stage('Pre-Deployment Checks') {
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Pre-Deployment Checks') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
                 echo "🔍 Checking Kubernetes cluster..."
 
@@ -106,10 +110,9 @@ pipeline {
                     credentialsId: 'kubeconfig-b64',
                     variable: 'KUBECONFIG_B64'
                 )]) {
-
                     sh '''
-                        echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
-                        export KUBECONFIG=/tmp/kubeconfig
+                        echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                        export KUBECONFIG=${KUBECONFIG_TMP}
 
                         kubectl cluster-info
                         kubectl get nodes
@@ -118,50 +121,97 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Deploy MySQL') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
-                echo "☸️ Deploying service..."
+                echo "🗄️ Deploying MySQL..."
 
                 withCredentials([string(
                     credentialsId: 'kubeconfig-b64',
                     variable: 'KUBECONFIG_B64'
                 )]) {
-
                     dir("${K8S_DIR}") {
-
                         sh '''
-                            echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
-                            export KUBECONFIG=/tmp/kubeconfig
+                            echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                            export KUBECONFIG=${KUBECONFIG_TMP}
 
-                            kubectl get namespace ${KUBE_NAMESPACE} || \
-                                kubectl create namespace ${KUBE_NAMESPACE}
+                            # Créer le namespace si absent
+                            kubectl get namespace ${KUBE_NAMESPACE} \
+                                || kubectl create namespace ${KUBE_NAMESPACE}
 
-                            kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
+                            # Secret MySQL (root-password, username, password)
+                            kubectl apply -f mysql-secret.yaml -n ${KUBE_NAMESPACE}
 
-                            if [ -f secret.yaml ]; then
-                                kubectl apply -f secret.yaml -n ${KUBE_NAMESPACE}
-                            fi
+                            # Deployment + Service MySQL
+                            kubectl apply -f mysql-deployment.yaml -n ${KUBE_NAMESPACE}
 
-                            sed -i "s|image: .*careplan-service.*|image: ${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG}|g" deployment.yaml
+                            # Attendre que MySQL soit prêt avant de continuer
+                            echo "⏳ Waiting for MySQL to be ready (max 3 min)..."
+                            kubectl rollout status deployment/mysql \
+                                -n ${KUBE_NAMESPACE} --timeout=180s
 
-                            kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
-
-                            if [ -f service.yaml ]; then
-                                kubectl apply -f service.yaml -n ${KUBE_NAMESPACE}
-                            fi
-
-                            kubectl rollout status deployment/careplan-service \
-                                -n ${KUBE_NAMESPACE} --timeout=300s
-
-                            kubectl get pods -n ${KUBE_NAMESPACE}
-                            kubectl get svc -n ${KUBE_NAMESPACE}
+                            echo "✓ MySQL is ready"
                         '''
                     }
                 }
             }
         }
 
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Deploy careplan-service') {
+        // ──────────────────────────────────────────────────────────────────────
+            steps {
+                echo "☸️ Deploying careplan-service..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+                    dir("${K8S_DIR}") {
+                        sh '''
+                            echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                            export KUBECONFIG=${KUBECONFIG_TMP}
+
+                            # ConfigMap (datasource MySQL + config Spring)
+                            kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
+
+                            # Secret credentials DB careplan
+                            kubectl apply -f secret.yaml -n ${KUBE_NAMESPACE}
+
+                            # Patcher l image sans toucher au fichier YAML (plus fiable que sed)
+                            kubectl set image deployment/careplan-service \
+                                careplan-service=${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG} \
+                                -n ${KUBE_NAMESPACE} 2>/dev/null \
+                            || kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
+
+                            # Service
+                            if [ -f service.yaml ]; then
+                                kubectl apply -f service.yaml -n ${KUBE_NAMESPACE}
+                            fi
+
+                            # Forcer 1 réplica : nœud single-node Vagrant, CPU limité
+                            kubectl scale deployment/careplan-service \
+                                --replicas=1 -n ${KUBE_NAMESPACE}
+
+                            # Attendre la fin du rollout
+                            echo "⏳ Waiting for careplan-service rollout (max 5 min)..."
+                            kubectl rollout status deployment/careplan-service \
+                                -n ${KUBE_NAMESPACE} --timeout=300s
+
+                            echo "── Pods ────────────────────────────────────────"
+                            kubectl get pods -n ${KUBE_NAMESPACE}
+                            echo "── Services ────────────────────────────────────"
+                            kubectl get svc  -n ${KUBE_NAMESPACE}
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
         stage('Health Check') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
                 echo "🏥 Health check..."
 
@@ -169,25 +219,28 @@ pipeline {
                     credentialsId: 'kubeconfig-b64',
                     variable: 'KUBECONFIG_B64'
                 )]) {
-
                     sh '''
-                        echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
-                        export KUBECONFIG=/tmp/kubeconfig
+                        echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                        export KUBECONFIG=${KUBECONFIG_TMP}
 
                         READY=$(kubectl get deployment careplan-service \
                             -n ${KUBE_NAMESPACE} \
-                            -o jsonpath='{.status.readyReplicas}' || echo 0)
+                            -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
 
                         DESIRED=$(kubectl get deployment careplan-service \
                             -n ${KUBE_NAMESPACE} \
-                            -o jsonpath='{.spec.replicas}' || echo 1)
+                            -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 1)
 
-                        echo "Pods: $READY/$DESIRED"
+                        echo "Pods ready: ${READY}/${DESIRED}"
 
-                        if [ "$READY" = "$DESIRED" ] && [ "$READY" != "0" ]; then
-                            echo "✅ Service healthy"
+                        if [ "${READY}" = "${DESIRED}" ] && [ "${READY}" != "0" ]; then
+                            echo "✅ careplan-service is healthy"
                         else
-                            echo "⚠ Service not fully ready"
+                            echo "❌ careplan-service not ready (${READY}/${DESIRED} pods)"
+                            kubectl describe pods \
+                                -n ${KUBE_NAMESPACE} \
+                                -l app=careplan-service | tail -30
+                            exit 1
                         fi
                     '''
                 }
@@ -195,27 +248,44 @@ pipeline {
         }
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
     post {
+    // ──────────────────────────────────────────────────────────────────────────
         success {
             echo """
             ✅ =====================================================
-            ✅ careplan-service deployed successfully
-            ✅ Image: ${DOCKERHUB_USER}/careplan-service:${DOCKER_TAG}
-            ✅ Namespace: ${KUBE_NAMESPACE}
+            ✅  careplan-service deployed successfully
+            ✅  Image     : ${env.DOCKERHUB_USER}/careplan-service:${DOCKER_TAG}
+            ✅  Namespace : ${KUBE_NAMESPACE}
             ✅ =====================================================
             """
         }
 
         failure {
-            echo """
-            ❌ =====================================================
-            ❌ Pipeline FAILED
-            ❌ Check logs above
-            ❌ =====================================================
-            """
+            // Rollback automatique de careplan-service en cas d'échec
+            withCredentials([string(
+                credentialsId: 'kubeconfig-b64',
+                variable: 'KUBECONFIG_B64'
+            )]) {
+                sh '''
+                    echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                    export KUBECONFIG=${KUBECONFIG_TMP}
+
+                    echo "⏪ Rolling back careplan-service to previous version..."
+                    kubectl rollout undo deployment/careplan-service \
+                        -n ${KUBE_NAMESPACE} || true
+
+                    echo "❌ ====================================================="
+                    echo "❌  Pipeline FAILED — rollback triggered"
+                    echo "❌  Check logs above for root cause"
+                    echo "❌ ====================================================="
+                '''
+            }
         }
 
         always {
+            // Suppression du kubeconfig temporaire dans tous les cas
+            sh "rm -f ${KUBECONFIG_TMP} || true"
             cleanWs()
         }
     }

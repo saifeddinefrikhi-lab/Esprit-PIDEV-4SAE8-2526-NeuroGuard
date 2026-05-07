@@ -7,7 +7,7 @@ metadata:
     app: careplan-service
     version: v1
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: careplan-service
@@ -18,62 +18,57 @@ spec:
         version: v1
     spec:
       containers:
-      - name: careplan-service
-        image: neuroguard/careplan-service:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8081
-          name: http
-          protocol: TCP
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "prod"
-        - name: SERVER_PORT
-          value: "8081"
-        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
-          value: "http://eureka-server.neuroguard.svc.cluster.local:8761/eureka"
-        - name: SPRING_APPLICATION_NAME
-          value: "careplan-service"
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /actuator/health
-            port: 8081
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /actuator/health/readiness
-            port: 8081
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-      restartPolicy: Always
-      terminationGracePeriodSeconds: 30
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: careplan-service
-  namespace: neuroguard
-  labels:
-    app: careplan-service
-spec:
-  type: ClusterIP
-  ports:
-  - port: 8081
-    targetPort: 8081
-    protocol: TCP
-    name: http
-  selector:
-    app: careplan-service
-  sessionAffinity: None
+        - name: careplan-service
+          image: ameniferjeni/careplan-service:latest   # patché par le pipeline
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: SERVER_PORT
+              value: "8081"
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://eureka-server.neuroguard.svc.cluster.local:8761/eureka
+            - name: SPRING_APPLICATION_NAME
+              value: careplan-service
+            # ── Credentials MySQL injectés depuis le Secret ──────────────────
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: careplan-db-secret
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: careplan-db-secret
+                  key: password
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: app-config
+              mountPath: /app/config
+      volumes:
+        - name: app-config
+          configMap:
+            name: careplan-service-config
