@@ -24,7 +24,7 @@ pipeline {
         stage('JUnit Tests') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "mvn clean test -B -DforkCount=0"
+                    sh "mvn clean test -B"
                 }
             }
             post {
