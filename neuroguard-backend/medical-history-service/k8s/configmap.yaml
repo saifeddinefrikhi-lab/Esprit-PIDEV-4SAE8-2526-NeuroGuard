@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: medical-history-service-config
+  namespace: neuroguard
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/medical_history_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+  SPRING_DATASOURCE_USERNAME: "root"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.MySQLDialect"
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_REDIS_HOST: "redis-service"
+  SPRING_REDIS_PORT: "6379"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka"
+  SERVER_PORT: "8091"
+  USER_SERVICE_URL: "http://user-service:8081"
+  APP_GEOCODING_PROVIDER: "nominatim"
+  APP_GEOCODING_NOMINATIM_USER_AGENT: "NeuroGuard-MedicalHistoryService/1.0"
+  APP_LOCATION_STREAMING_ENABLED: "true"

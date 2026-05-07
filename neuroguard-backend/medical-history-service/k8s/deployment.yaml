@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medical-history-service
+  namespace: neuroguard
+  labels:
+    app: medical-history-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: medical-history-service
+  template:
+    metadata:
+      labels:
+        app: medical-history-service
+    spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z mysql-service 3306; do echo 'waiting for mysql-service:3306'; sleep 5; done
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z redis-service 6379; do echo 'waiting for redis-service:6379'; sleep 5; done
+        - name: wait-for-eureka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z eureka-server 8761; do echo 'waiting for eureka-server:8761'; sleep 5; done
+      containers:
+        - name: medical-history-service
+          image: ameniferjeni/medical-history-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8091
+          envFrom:
+            - configMapRef:
+                name: medical-history-service-config
+            - secretRef:
+                name: medical-history-service-secret
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 60      # ← 60 × 10s = 600s max startup time
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8091
+            initialDelaySeconds: 180
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
