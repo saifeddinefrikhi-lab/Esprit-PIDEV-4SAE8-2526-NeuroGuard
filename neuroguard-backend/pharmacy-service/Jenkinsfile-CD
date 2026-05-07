@@ -1,237 +1,308 @@
 pipeline {
     agent any
-    
+
     parameters {
-        string(name: 'DOCKER_TAG', defaultValue: 'latest', description: 'Docker image tag to deploy')
-        string(name: 'BUILD_NUMBER_CI', defaultValue: '1', description: 'CI Build number')
-        string(name: 'COMMIT_SHA', defaultValue: 'unknown', description: 'Commit SHA from CI pipeline')
+        string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build number from CI pipeline')
+        string(name: 'COMMIT_SHA',      defaultValue: '',       description: 'Exact commit SHA produced by CI')
     }
-    
+
     environment {
-        DOCKER_IMAGE = "neuroguard/pharmacy-service"
-        SERVICE_NAME = "pharmacy-service"
-        SERVICE_DIR = "neuroguard-backend/pharmacy-service"
-        K8S_MANIFEST_DIR = "neuroguard-backend/k8s/pharmacy-service"
+        DOCKER_IMAGE   = "neuroguard/pharmacy-service"
+        DOCKER_TAG     = "${params.BUILD_NUMBER_CI}"
+        SERVICE_DIR    = "neuroguard-backend/pharmacy-service"
+        K8S_DIR        = "neuroguard-backend/k8s/pharmacy-service"
+        GIT_REPO       = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH     = 'hamza'
         KUBE_NAMESPACE = "neuroguard"
         KUBECONFIG_TMP = "/tmp/kubeconfig-${BUILD_NUMBER}"
-        DOCKER_REGISTRY = "neuroguard"
     }
-    
-    options { 
-        timeout(time: 15, unit: 'MINUTES')
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
+        skipDefaultCheckout(true)
     }
     
     stages {
-        stage('Checkout') {
+
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Code Checkout') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
-                checkout scm
+                echo "📦 Checking out code from ${GIT_REPO}..."
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+                script {
+                    if (params.COMMIT_SHA?.trim()) {
+                        echo "🔗 Checking out specific commit: ${params.COMMIT_SHA}"
+                        sh "git checkout ${params.COMMIT_SHA}"
+                    }
+                }
             }
         }
-        
+
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Build Docker Image') {
+        // ──────────────────────────────────────────────────────────────────────
+            steps {
+                echo "🔨 Building Docker image ${DOCKER_IMAGE}:${DOCKER_TAG}..."
+                dir("${SERVICE_DIR}") {
+                    sh "mvn clean package -DskipTests -B -q"
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
+                    stash name: 'docker-image', includes: 'docker-image.tar'
+                    echo "✓ Docker image built successfully"
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Push to DockerHub') {
+        // ──────────────────────────────────────────────────────────────────────
+            steps {
+                echo "📤 Pushing image to DockerHub..."
+                unstash 'docker-image'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    dir("${SERVICE_DIR}") {
+                        sh '''
+                            docker load -i docker-image.tar
+
+                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG}
+
+                            echo "${DOCKER_PASS}" | docker login \
+                                -u "${DOCKER_USER}" \
+                                --password-stdin
+                        '''
+
+                        retry(3) {
+                            sh "docker push ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG}"
+                        }
+
+                        sh '''
+                            docker logout
+                            docker rmi \
+                                ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                ${DOCKER_USER}/pharmacy-service:${DOCKER_TAG} || true
+                        '''
+
+                        script {
+                            env.DOCKERHUB_USER = DOCKER_USER
+                        }
+
+                        echo "✓ Docker image pushed successfully"
+                    }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
         stage('Pre-Deployment Checks') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
-                echo "🔍 Pre-deployment checks..."
-                script {
-                    withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
-                        sh '''
-                            echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
-                            export KUBECONFIG=${KUBECONFIG_TMP}
-                            
-                            echo "Checking kubectl connectivity..."
-                            kubectl cluster-info
-                            
-                            echo ""
-                            echo "Kubernetes version:"
-                            kubectl version --short
-                            
-                            echo ""
-                            echo "Checking namespace..."
-                            kubectl get namespace ${KUBE_NAMESPACE} || echo "Namespace will be created"
-                        '''
-                    }
+                echo "🔍 Checking Kubernetes cluster..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+                    sh '''
+                        echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                        export KUBECONFIG=${KUBECONFIG_TMP}
+
+                        kubectl cluster-info
+                        kubectl get nodes
+                    '''
                 }
             }
         }
-        
-        stage('Deploy to Kubernetes') {
+
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Deploy MySQL') {
+        // ──────────────────────────────────────────────────────────────────────
+        // Déploie MySQL depuis les fichiers YAML du repo
+        // et attend qu'il soit prêt avant de continuer
+        // ──────────────────────────────────────────────────────────────────────
             steps {
-                echo "🚀 Deploying ${SERVICE_NAME}:${DOCKER_TAG} to Kubernetes..."
-                script {
-                    withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
+                echo "🗄️ Deploying MySQL..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+                    dir("${K8S_DIR}") {
                         sh '''
                             echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
                             export KUBECONFIG=${KUBECONFIG_TMP}
-                            
-                            # Create namespace if it doesn't exist
+
+                            # Namespace
                             kubectl create namespace ${KUBE_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                            echo "✓ Namespace '${KUBE_NAMESPACE}' ready"
-                            
-                            # Apply MySQL deployment first
-                            echo "Deploying MySQL..."
-                            kubectl apply -f ${K8S_MANIFEST_DIR}/mysql-secret.yaml
-                            kubectl apply -f ${K8S_MANIFEST_DIR}/mysql-configmap.yaml
-                            kubectl apply -f ${K8S_MANIFEST_DIR}/mysql-deployment.yaml
-                            echo "✓ MySQL deployment applied"
-                            
-                            # Wait for MySQL to be ready
-                            echo "Waiting for MySQL to be ready..."
-                            kubectl wait --for=condition=ready pod -l app=pharmacy-mysql -n ${KUBE_NAMESPACE} --timeout=300s || true
-                            
-                            # Apply service secret and configmap
-                            kubectl apply -f ${K8S_MANIFEST_DIR}/secret.yaml
-                            kubectl apply -f ${K8S_MANIFEST_DIR}/configmap.yaml
-                            echo "✓ Service secrets and config applied"
-                            
-                            # Apply complete deployment manifest
-                            kubectl apply -f ${K8S_MANIFEST_DIR}/deployment.yaml
-                            echo "✓ Deployment applied"
-                            
-                            # Force rollout restart to ensure new pods with updated spec
-                            kubectl rollout restart deployment/${SERVICE_NAME} -n ${KUBE_NAMESPACE}
-                            echo "✓ Rollout restart triggered"
-                            
-                            # Update image tag if different from default
-                            if [ "${DOCKER_TAG}" != "latest" ]; then
-                                kubectl set image deployment/${SERVICE_NAME} \
-                                    ${SERVICE_NAME}=${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_TAG} \
-                                    -n ${KUBE_NAMESPACE}
-                                echo "✓ Image updated to ${DOCKER_TAG}"
-                            fi
+
+                            # Secret MySQL
+                            kubectl apply -f mysql-secret.yaml -n ${KUBE_NAMESPACE}
+
+                            # Deployment + Service MySQL
+                            kubectl apply -f mysql-deployment.yaml -n ${KUBE_NAMESPACE}
+
+                            # Attendre que MySQL soit opérationnel (max 4 min)
+                            echo "⏳ Waiting for MySQL to be ready..."
+                            kubectl rollout status deployment/pharmacy-mysql \
+                                -n ${KUBE_NAMESPACE} --timeout=240s
+
+                            echo "✓ MySQL is ready"
                         '''
                     }
                 }
             }
         }
-        
-        stage('Wait for Rollout') {
+
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Deploy pharmacy-service') {
+        // ──────────────────────────────────────────────────────────────────────
             steps {
-                echo "⏳ Waiting for rollout to complete..."
-                script {
-                    withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
+                echo "☸️ Deploying pharmacy-service..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+                    dir("${K8S_DIR}") {
                         sh '''
                             echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
                             export KUBECONFIG=${KUBECONFIG_TMP}
-                            
-                            echo "Waiting for deployment to be ready (max 10 minutes)..."
-                            kubectl rollout status deployment/${SERVICE_NAME} \
+
+                            # ConfigMap
+                            kubectl apply -f configmap.yaml -n ${KUBE_NAMESPACE}
+
+                            # Secret credentials DB pharmacy
+                            kubectl create secret generic pharmacy-db-secret \
+                                --from-literal=username=pharmacy \
+                                --from-literal=password=pharmacypass \
                                 -n ${KUBE_NAMESPACE} \
-                                --timeout=10m
-                            
-                            echo "✓ Rollout completed successfully"
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Verify Deployment') {
-            steps {
-                echo "✓ Verifying deployment..."
-                script {
-                    withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
-                        sh '''
-                            echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
-                            export KUBECONFIG=${KUBECONFIG_TMP}
-                            
-                            echo "======================================"
-                            echo "Pods Status:"
-                            echo "======================================"
-                            kubectl get pods -n ${KUBE_NAMESPACE} -l app=${SERVICE_NAME} -o wide
-                            
-                            echo ""
-                            echo "======================================"
-                            echo "Service Status:"
-                            echo "======================================"
-                            kubectl get svc ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o wide
-                            
-                            echo ""
-                            echo "======================================"
-                            echo "Deployment Details:"
-                            echo "======================================"
-                            kubectl describe deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} | tail -30
-                            
-                            echo ""
-                            echo "======================================"
-                            echo "Recent Events:"
-                            echo "======================================"
-                            kubectl get events -n ${KUBE_NAMESPACE} --sort-by='.lastTimestamp' | tail -10
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Health Check') {
-            steps {
-                echo "🏥 Running health checks..."
-                script {
-                    withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
-                        sh '''
-                            echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
-                            export KUBECONFIG=${KUBECONFIG_TMP}
-                            
-                            echo "Checking pod status..."
-                            READY_PODS=$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.status.readyReplicas}')
-                            DESIRED_PODS=$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.spec.replicas}')
-                            
-                            echo "Ready pods: ${READY_PODS}/${DESIRED_PODS}"
-                            
-                            if [ "${READY_PODS}" = "${DESIRED_PODS}" ]; then
-                                echo "✓ All pods are ready"
-                            else
-                                echo "⚠ Not all pods are ready yet"
-                                exit 1
+                                --dry-run=client -o yaml | kubectl apply -f -
+
+                            # Apply full deployment manifest to ensure complete spec (including init containers, probes, etc.)
+                            kubectl apply -f deployment.yaml -n ${KUBE_NAMESPACE}
+
+                            # Force rollout restart to ensure new pods with updated spec are created
+                            kubectl rollout restart deployment/pharmacy-service -n ${KUBE_NAMESPACE}
+
+                            # Update image tag if different from deployment.yaml default
+                            if [ "${DOCKER_TAG}" != "latest" ]; then
+                                kubectl set image deployment/pharmacy-service \
+                                    pharmacy-service=${DOCKERHUB_USER}/pharmacy-service:${DOCKER_TAG} \
+                                    -n ${KUBE_NAMESPACE}
                             fi
+
+                            # Service
+                            if [ -f service.yaml ]; then
+                                kubectl apply -f service.yaml -n ${KUBE_NAMESPACE}
+                            fi
+
+                            # 3 replicas for pharmacy-service
+                            kubectl scale deployment/pharmacy-service \
+                                --replicas=3 -n ${KUBE_NAMESPACE}
+
+                            # Attendre la fin du rollout (max 5 min)
+                            echo "⏳ Waiting for pharmacy-service rollout..."
+                            kubectl rollout status deployment/pharmacy-service \
+                                -n ${KUBE_NAMESPACE} --timeout=300s
+
+                            echo "── Pods ─────────────────────────────────────────"
+                            kubectl get pods -n ${KUBE_NAMESPACE}
+                            echo "── Services ─────────────────────────────────────"
+                            kubectl get svc  -n ${KUBE_NAMESPACE}
                         '''
                     }
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────────
+        stage('Health Check') {
+        // ──────────────────────────────────────────────────────────────────────
+            steps {
+                echo "🏥 Health check..."
+
+                withCredentials([string(
+                    credentialsId: 'kubeconfig-b64',
+                    variable: 'KUBECONFIG_B64'
+                )]) {
+                    sh '''
+                        echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                        export KUBECONFIG=${KUBECONFIG_TMP}
+
+                        READY=$(kubectl get deployment pharmacy-service \
+                            -n ${KUBE_NAMESPACE} \
+                            -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+
+                        DESIRED=$(kubectl get deployment pharmacy-service \
+                            -n ${KUBE_NAMESPACE} \
+                            -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 3)
+
+                        echo "Pods ready: ${READY}/${DESIRED}"
+
+                        if [ "${READY}" = "${DESIRED}" ] && [ "${READY}" != "0" ]; then
+                            echo "✅ pharmacy-service is healthy"
+                        else
+                            echo "❌ pharmacy-service not ready (${READY}/${DESIRED} pods)"
+                            kubectl describe pods \
+                                -n ${KUBE_NAMESPACE} \
+                                -l app=pharmacy-service | tail -40
+                            exit 1
+                        fi
+                    '''
                 }
             }
         }
     }
-    
+
+    // ──────────────────────────────────────────────────────────────────────────
     post {
+    // ──────────────────────────────────────────────────────────────────────────
         success {
-            echo "✅ Deployment successful!"
-            script {
-                withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
-                    sh '''
-                        echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
-                        export KUBECONFIG=${KUBECONFIG_TMP}
-                        
-                        echo ""
-                        echo "======================================"
-                        echo "Deployment Summary:"
-                        echo "======================================"
-                        echo "Service: ${SERVICE_NAME}"
-                        echo "Image: ${DOCKER_REGISTRY}/${SERVICE_NAME}:${DOCKER_TAG}"
-                        echo "Namespace: ${KUBE_NAMESPACE}"
-                        echo "Replicas: $(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.status.readyReplicas}')/$(kubectl get deployment ${SERVICE_NAME} -n ${KUBE_NAMESPACE} -o jsonpath='{.spec.replicas}')"
-                        echo "======================================"
-                    '''
-                }
-            }
+            echo """
+            ✅ =====================================================
+            ✅  pharmacy-service deployed successfully
+            ✅  Image     : ${env.DOCKERHUB_USER}/pharmacy-service:${DOCKER_TAG}
+            ✅  Namespace : ${KUBE_NAMESPACE}
+            ✅ =====================================================
+            """
         }
+
         failure {
-            echo "❌ Deployment failed!"
-            script {
-                withCredentials([string(credentialsId: 'kubeconfig-b64', variable: 'KUBECONFIG_B64')]) {
-                    sh '''
-                        echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
-                        export KUBECONFIG=${KUBECONFIG_TMP}
-                        
-                        echo "Collecting debug information..."
-                        echo ""
-                        echo "Pod logs:"
-                        kubectl logs -n ${KUBE_NAMESPACE} -l app=${SERVICE_NAME} --tail=50 || echo "No logs available"
-                        
-                        echo ""
-                        echo "Pod descriptions:"
-                        kubectl describe pods -n ${KUBE_NAMESPACE} -l app=${SERVICE_NAME}
-                    '''
-                }
+            withCredentials([string(
+                credentialsId: 'kubeconfig-b64',
+                variable: 'KUBECONFIG_B64'
+            )]) {
+                sh '''
+                    echo "$KUBECONFIG_B64" | base64 -d > ${KUBECONFIG_TMP}
+                    export KUBECONFIG=${KUBECONFIG_TMP}
+
+                    # Rollback uniquement si pharmacy-service a déjà un historique
+                    HISTORY=$(kubectl rollout history deployment/pharmacy-service \
+                        -n ${KUBE_NAMESPACE} 2>/dev/null | wc -l || echo 0)
+
+                    if [ "$HISTORY" -gt "2" ]; then
+                        echo "⏪ Rolling back pharmacy-service..."
+                        kubectl rollout undo deployment/pharmacy-service \
+                            -n ${KUBE_NAMESPACE} || true
+                    else
+                        echo "⚠ No rollback history available — skipping rollback"
+                    fi
+
+                    echo "❌ ====================================================="
+                    echo "❌  Pipeline FAILED"
+                    echo "❌  Check logs above for root cause"
+                    echo "❌ ====================================================="
+                '''
             }
         }
+
         always {
             sh "rm -f ${KUBECONFIG_TMP} || true"
             cleanWs()
