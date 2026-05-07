@@ -79,7 +79,7 @@ pipeline {
                 }
             }
         }
-        stage('Trigger CD Pipeline') {
+        stage('Trigger CD Pipeline') {  
     steps {
         echo '✅ CI passed – triggering CD pipeline...'
 
