@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: risk-alert-service-config
+  namespace: neuroguard
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/risk_alert_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+  SPRING_DATASOURCE_USERNAME: "root"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.MySQLDialect"
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_REDIS_HOST: "redis-service"
+  SPRING_REDIS_PORT: "6379"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka"
+  SERVER_PORT: "8092"
+  USER_SERVICE_URL: "http://user-service:8081"
+  MEDICAL_HISTORY_SERVICE_URL: "http://medical-history-service:8091"
+  CONSULTATION_SERVICE_URL: "http://consultation-service:8090"

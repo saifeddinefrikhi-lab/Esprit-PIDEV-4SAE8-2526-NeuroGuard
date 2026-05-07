@@ -1,0 +1,84 @@
+pipeline {
+    agent any
+    triggers {
+        githubPush()
+    }
+    environment {
+        GIT_REPO    = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH  = 'ameni'
+        SONAR_TOKEN = credentials('sonar-token')
+        SERVICE_DIR = "neuroguard-backend/risk-alert-service"
+        MAVEN_OPTS  = "-Xmx1024m"
+    }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git branch: "${GIT_BRANCH}",
+                    url: "${GIT_REPO}"
+            }
+        }
+        stage('Unit Tests + Build') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    echo '🧪 Running tests with JaCoCo coverage...'
+                    dir("${SERVICE_DIR}") {
+                        sh "mvn test package -B -DforkCount=1"
+                    }
+                    echo '✅ Tests passed, JaCoCo report generated'
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: "${SERVICE_DIR}/target/surefire-reports/*.xml"
+                }
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                timeout(time: 15, unit: 'MINUTES') {
+                    dir("${SERVICE_DIR}") {
+                        withSonarQubeEnv('SonarQube') {
+                            sh """mvn sonar:sonar -B -DskipTests \
+                                -Dsonar.projectKey=neuroguard-risk-alert-service \
+                                -Dsonar.projectName=\"NeuroGuard - Risk Alert Service\" \
+                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                                -Dsonar.sources=src/main \
+                                -Dsonar.login=${SONAR_TOKEN}"""
+                        }
+                    }
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
+        stage('Trigger CD Pipeline') {
+            steps {
+                echo '✅ CI passed – triggering CD pipeline...'
+                script {
+                    def cdJobName = env.JOB_NAME.replaceFirst(/^CI_/, 'CD_')
+                    def commitSha = env.GIT_COMMIT ?: sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                    build job: cdJobName,
+                          parameters: [
+                              string(name: 'BUILD_NUMBER_CI', value: "${env.BUILD_NUMBER}"),
+                              string(name: 'COMMIT_SHA', value: commitSha)
+                          ],
+                          wait: false
+                }
+            }
+        }
+    }
+    post {
+        always { cleanWs() }
+        failure { echo '❌ CI pipeline failed – CD will NOT be triggered.' }
+    }
+}
