@@ -47,7 +47,7 @@ pipeline {
             publishHTML([
                 reportDir: "${SERVICE_DIR}/target/site/jacoco",
                 reportFiles: 'index.html',
-                reportName: 'Code Coverage Report',
+                reportName: 'JaCoCo Code Coverage Report',
                 keepAll: true,
                 alwaysLinkToLastBuild: true,
                 allowMissing: true
@@ -65,6 +65,7 @@ pipeline {
                                 -Dsonar.projectName=\"NeuroGuard - CarePlan Service\" \
                                 -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
                                 -Dsonar.sources=src/main \
+                                -Dsonar.exclusions=src/test/**/*.* \
                                 -Dsonar.login=${SONAR_TOKEN}"""
                         }
                     }
