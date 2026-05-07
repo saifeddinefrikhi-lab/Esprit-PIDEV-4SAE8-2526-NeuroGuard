@@ -4,19 +4,27 @@ metadata:
   name: forum-service
   labels:
     app: forum-service
+
 spec:
   replicas: 1
+
+  strategy:
+    type: Recreate
+
   selector:
     matchLabels:
       app: forum-service
+
   template:
     metadata:
       labels:
         app: forum-service
+
     spec:
       containers:
         - name: forum-service
           image: 10830313/forum-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8085
           env:
