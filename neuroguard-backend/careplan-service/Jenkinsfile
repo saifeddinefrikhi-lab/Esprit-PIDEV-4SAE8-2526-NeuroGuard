@@ -26,7 +26,8 @@ pipeline {
                 timeout(time: 20, unit: 'MINUTES') {
                     echo '🧪 Running tests with JaCoCo coverage...'
                     dir("${SERVICE_DIR}") {
-                        sh "mvn test package -B -DforkCount=0"
+                        sh "mvn clean test -B -DforkCount=1"
+                        sh "mvn package -DskipTests -B"
                     }
                     echo '✅ Tests passed, JaCoCo report generated'
                 }
