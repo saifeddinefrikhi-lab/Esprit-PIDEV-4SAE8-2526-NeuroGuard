@@ -72,24 +72,24 @@ pipeline {
                     kubectl --insecure-skip-tls-verify get nodes
 
                     # Create namespace if it doesn't exist
-                    kubectl --insecure-skip-tls-verify get namespace neuroguard 2>/dev/null || kubectl --insecure-skip-tls-verify create namespace neuroguard
+                    kubectl get namespace neuroguard 2>/dev/null || kubectl create namespace neuroguard
 
                     # Apply configmap and secret
-                    kubectl --insecure-skip-tls-verify apply -f configmap.yaml --namespace=neuroguard
-                    kubectl --insecure-skip-tls-verify apply -f secret.yaml    --namespace=neuroguard
+                    kubectl apply -f configmap.yaml --namespace=neuroguard
+                    kubectl apply -f secret.yaml    --namespace=neuroguard
 
                     # Update image tag in deployment.yaml
                     sed -i "s|image: .*consultation-service.*|image: ${DOCKERHUB_USER}/consultation-service:${DOCKER_TAG}|" deployment.yaml
 
                     # Apply all manifests
-                    kubectl --insecure-skip-tls-verify apply -f deployment.yaml --namespace=neuroguard
-                    kubectl --insecure-skip-tls-verify apply -f service.yaml    --namespace=neuroguard
+                    kubectl apply -f deployment.yaml --namespace=neuroguard
+                    kubectl apply -f service.yaml    --namespace=neuroguard
 
                     # Wait for rollout
-                    kubectl --insecure-skip-tls-verify rollout status deployment/consultation-service --namespace=neuroguard --timeout=120s
+                    kubectl rollout status deployment/consultation-service --namespace=neuroguard --timeout=120s
 
                     # Show running pods
-                    kubectl --insecure-skip-tls-verify get pods -l app=consultation-service --namespace=neuroguard
+                    kubectl get pods -l app=consultation-service --namespace=neuroguard
 
                     # Cleanup temp kubeconfig
                     rm -f /tmp/kubeconfig
