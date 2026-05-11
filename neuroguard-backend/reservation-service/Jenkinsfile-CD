@@ -1,0 +1,99 @@
+pipeline {
+    agent any
+    parameters {
+        string(name: 'BUILD_NUMBER_CI', defaultValue: 'latest', description: 'Build number from CI pipeline')
+    }
+    environment {
+        DOCKER_IMAGE = "neuroguard/reservation-service"
+        DOCKER_TAG   = "${params.BUILD_NUMBER_CI}"
+        SERVICE_DIR  = "neuroguard-backend/reservation-service"
+        GIT_REPO     = 'https://github.com/saifeddinefrikhi-lab/Esprit-PIDEV-4SAE8-2526-NeuroGuard.git'
+        GIT_BRANCH   = 'main'
+    }
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "mvn clean package -DskipTests -B -q"
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh "docker save ${DOCKER_IMAGE}:${DOCKER_TAG} -o docker-image.tar"
+                    stash name: 'docker-image', includes: 'docker-image.tar'
+                }
+            }
+        }
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub',
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    dir("${SERVICE_DIR}") {
+                        unstash 'docker-image'
+                        sh 'docker load -i docker-image.tar'
+                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/reservation-service:${DOCKER_TAG}"
+                        sh 'echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin'
+                        retry(3) {
+                            sh "docker push ${DOCKER_USER}/reservation-service:${DOCKER_TAG}"
+                        }
+                        sh 'docker logout'
+                        sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_USER}/reservation-service:${DOCKER_TAG} || true"
+                        script { env.DOCKERHUB_USER = DOCKER_USER }
+                    }
+                }
+            }
+        }
+       stage('Deploy to Kubernetes') {
+    steps {
+        echo '☸️ Deploying to Kubernetes (kubeadm)...'
+        withCredentials([string(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_B64')]) {
+            dir("${SERVICE_DIR}/k8s") {
+                sh """
+                    # Decode kubeconfig to a temp file
+                    echo "\$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
+                    export KUBECONFIG=/tmp/kubeconfig
+
+                    # Verify cluster is reachable
+                    kubectl get nodes
+
+                    # Create namespace if it doesn't exist
+                    kubectl get namespace neuroguard 2>/dev/null || kubectl create namespace neuroguard
+
+                    # Apply configmap and secret
+                    kubectl apply -f configmap.yaml --namespace=neuroguard
+                    kubectl apply -f secret.yaml    --namespace=neuroguard
+
+                    # Update image tag in deployment.yaml
+                    sed -i "s|image: .*reservation-service.*|image: ${DOCKERHUB_USER}/reservation-service:${DOCKER_TAG}|" deployment.yaml
+
+                    # Apply all manifests
+                    kubectl apply -f deployment.yaml --namespace=neuroguard
+                    kubectl apply -f service.yaml    --namespace=neuroguard
+
+                    # Wait for rollout
+                    kubectl rollout status deployment/reservation-service --namespace=neuroguard --timeout=120s
+
+                    # Show running pods
+                    kubectl get pods -l app=reservation-service --namespace=neuroguard
+
+                    # Cleanup temp kubeconfig
+                    rm -f /tmp/kubeconfig
+                """
+            }
+        }
+    }
+}
+    }
+    post {
+        always { cleanWs() }
+        success { echo '✅ reservation-service deployed to kubeadm cluster.' }
+        failure  { echo '❌ CD pipeline failed.' }
+    }
+}

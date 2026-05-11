@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assurance-service-config
+  namespace: neuroguard
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/neuroguard_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC"
+  SPRING_DATASOURCE_USERNAME: "root"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_SHOW_SQL: "false"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka"
+  SERVER_PORT: "8091"
+  ML_PREDICTOR_SERVICE_URL: "http://ml-predictor-service:5000"
+  SPRING_MAIL_HOST: "smtp.gmail.com"
+  SPRING_MAIL_PORT: "587"
+  SPRING_THYMELEAF_ENABLED: "true"
+  SPRING_THYMELEAF_CACHE: "true"
